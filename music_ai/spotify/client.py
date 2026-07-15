@@ -18,9 +18,18 @@ class SpotifyClient:
         """Return the authenticated Spotify user's profile."""
         return self._request("GET", "/me")
 
-    def saved_tracks(self, limit: int = 20) -> list[dict[str, Any]]:
-        """Return the authenticated user's saved tracks."""
-        response_data = self._request("GET", "/me/tracks", params={"limit": limit})
+    def saved_tracks(self, limit: int = 20, offset: int = 0) -> list[dict[str, Any]]:
+        """Return one page of the authenticated user's saved tracks."""
+        if not 1 <= limit <= 50:
+            raise ValueError("limit must be between 1 and 50.")
+        if offset < 0:
+            raise ValueError("offset must be greater than or equal to 0.")
+
+        response_data = self._request(
+            "GET",
+            "/me/tracks",
+            params={"limit": limit, "offset": offset},
+        )
         return response_data.get("items", [])
 
     def _request(

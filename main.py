@@ -1,51 +1,68 @@
 from typing import Any
 
 from config import load_spotify_settings
+from music_ai.database.database import Database
+from music_ai.models.saved_track import SavedTrack
+from music_ai.parser.spotify_parser import parse_saved_track
+from music_ai.repository.saved_track_repository import SavedTrackRepository
+from music_ai.repository.song_repository import SongRepository
 from music_ai.spotify.auth import SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 
 
 def main() -> None:
-    """Authenticate with Spotify and print a small account summary."""
+    """Import the authenticated user's saved Spotify tracks into MusicMind."""
     settings = load_spotify_settings()
     auth = SpotifyAuth(settings)
     token = auth.authenticate()
 
     client = SpotifyClient(token)
-    user = client.current_user()
-    tracks = client.saved_tracks()
+    client.current_user()
 
-    _print_user(user)
-    _print_saved_tracks(tracks)
-
-
-def _print_user(user: dict[str, Any]) -> None:
     print("Spotify Login Success")
-    print(f"Display Name: {user.get('display_name') or 'N/A'}")
-    print(f"User ID: {user['id']}")
-    print(f"Country: {user.get('country') or 'N/A'}")
-    print(f"Product: {_format_product(user.get('product'))}")
+    print("Downloading saved tracks...")
+    saved_tracks, skipped_tracks = _parse_saved_tracks(_download_saved_tracks(client))
+
+    database = Database()
+    database.initialize()
+    SongRepository(database).save_all([saved_track.song for saved_track in saved_tracks])
+    SavedTrackRepository(database).save_all(saved_tracks)
+
+    print(f"Imported {len(saved_tracks)} songs.")
+    if skipped_tracks:
+        print(f"Skipped {skipped_tracks} unavailable or local tracks.")
+    print("Database updated successfully.")
 
 
-def _print_saved_tracks(tracks: list[dict[str, Any]]) -> None:
-    print(f"Saved Tracks: {len(tracks)}")
+def _download_saved_tracks(client: SpotifyClient) -> list[dict[str, Any]]:
+    """Download every page of the current user's saved tracks."""
+    tracks: list[dict[str, Any]] = []
+    page_size = 50
+    offset = 0
 
-    for index, item in enumerate(tracks, start=1):
-        track = item.get("track") or {}
-        track_name = track.get("name") or "Unknown Track"
-        artists = track.get("artists") or []
-        artist_names = ", ".join(artist.get("name", "Unknown Artist") for artist in artists)
-        print(f"{index}. {track_name} - {artist_names or 'Unknown Artist'}")
+    while True:
+        page = client.saved_tracks(limit=page_size, offset=offset)
+        tracks.extend(page)
+
+        if len(page) < page_size:
+            return tracks
+
+        offset += len(page)
 
 
-def _format_product(product: str | None) -> str:
-    if not product:
-        return "N/A"
-    if product == "premium":
-        return "Premium"
-    if product == "free":
-        return "Free"
-    return product.title()
+def _parse_saved_tracks(items: list[dict[str, Any]]) -> tuple[list[SavedTrack], int]:
+    """Convert Spotify saved-track JSON into importable MusicMind objects."""
+    saved_tracks: list[SavedTrack] = []
+    skipped_tracks = 0
+
+    for item in items:
+        saved_track = parse_saved_track(item)
+        if saved_track is None:
+            skipped_tracks += 1
+            continue
+        saved_tracks.append(saved_track)
+
+    return saved_tracks, skipped_tracks
 
 
 if __name__ == "__main__":
