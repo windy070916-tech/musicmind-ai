@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS songs (
     album TEXT NOT NULL,
     duration_ms INTEGER NOT NULL,
     explicit INTEGER NOT NULL,
-    popularity INTEGER NOT NULL
+    popularity INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS saved_tracks (

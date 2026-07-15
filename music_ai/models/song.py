@@ -1,6 +1,7 @@
 """Song domain model."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -13,4 +14,4 @@ class Song:
     album: str
     duration_ms: int
     explicit: bool
-    popularity: int
+    popularity: Optional[int]

@@ -1,6 +1,5 @@
 """Convert Spotify Web API responses into MusicMind domain models."""
 
-import json
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -32,7 +31,7 @@ def parse_song(track_data: Mapping[str, Any]) -> Song:
         album=_required_string(album_data, "name", "Spotify album"),
         duration_ms=_required_integer(track_data, "duration_ms", "Spotify track"),
         explicit=_required_boolean(track_data, "explicit", "Spotify track"),
-        popularity=_required_integer(track_data, "popularity", "Spotify track"),
+        popularity=_optional_integer(track_data, "popularity", "Spotify track"),
     )
 
 
@@ -58,7 +57,6 @@ def parse_saved_track(saved_track_data: Mapping[str, Any]) -> SavedTrack | None:
         _required_string(saved_track_data, "added_at", "Spotify saved track")
     )
 
-    _print_invalid_popularity_payload(saved_track_data, track_data)
     return SavedTrack(song=parse_song(track_data), added_at=added_at)
 
 
@@ -86,20 +84,15 @@ def _required_integer(data: Mapping[str, Any], key: str, context: str) -> int:
     return value
 
 
-def _print_invalid_popularity_payload(
-    saved_track_data: Mapping[str, Any], track_data: Mapping[str, Any]
-) -> None:
-    """Print the complete saved-track response before popularity validation fails.
+def _optional_integer(data: Mapping[str, Any], key: str, context: str) -> int | None:
+    """Return an optional integer from an API response."""
+    if key not in data:
+        return None
 
-    This temporary diagnostic preserves the parser's fail-fast validation while
-    exposing the exact Spotify payload that lacks a valid track popularity.
-    """
-    popularity = track_data.get("popularity")
-    if isinstance(popularity, int) and not isinstance(popularity, bool):
-        return
-
-    print("Invalid Spotify saved-track payload (missing valid popularity):")
-    print(json.dumps(saved_track_data, indent=2))
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{context} has an invalid '{key}' value.")
+    return value
 
 
 def _required_boolean(data: Mapping[str, Any], key: str, context: str) -> bool:
