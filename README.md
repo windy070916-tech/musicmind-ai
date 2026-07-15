@@ -11,6 +11,7 @@ After authenticating your Spotify account, the app prints:
 - User ID
 - Country
 - Product
+- Saved Tracks
 
 ## Requirements
 
@@ -47,7 +48,8 @@ python main.py
 ```
 
 The app opens Spotify authorization in your browser. After login, Spotify redirects
-back to the local callback server and the terminal prints your account details.
+back to the local callback server and the terminal prints your account details and
+your first 20 saved tracks.
 
 ## Project Structure
 

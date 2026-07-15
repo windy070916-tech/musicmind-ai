@@ -13,7 +13,7 @@ from config import SpotifySettings
 
 AUTHORIZATION_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
-DEFAULT_SCOPES = ("user-read-private",)
+DEFAULT_SCOPES = ("user-read-private", "user-library-read")
 
 
 @dataclass(frozen=True)
@@ -26,11 +26,14 @@ class SpotifyToken:
 
 
 class SpotifyAuth:
+    """Handles Spotify OAuth authorization and token exchange."""
+
     def __init__(self, settings: SpotifySettings, scopes: tuple[str, ...] = DEFAULT_SCOPES):
         self._settings = settings
         self._scopes = scopes
 
     def authenticate(self) -> SpotifyToken:
+        """Run the browser-based OAuth flow and return a Spotify access token."""
         state = token_urlsafe(32)
         callback_server = _CallbackServer(self._settings.redirect_uri, expected_state=state)
         authorization_url = self._build_authorization_url(state)
