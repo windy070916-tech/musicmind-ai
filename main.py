@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from config import load_spotify_settings
@@ -20,15 +21,16 @@ def main() -> None:
     client = SpotifyClient(token)
     client.current_user()
 
-    print("Spotify Login Success")
-    print("Downloading Recently Played...")
-    songs, play_history = _parse_recent_tracks(client.recent_tracks(limit=50))
-
     database = Database()
     database.initialize()
+    play_history_repository = PlayHistoryRepository(database)
+    latest_played_at = play_history_repository.latest_played_at()
+
+    print("Spotify Login Success")
+    recent_tracks = _download_recent_tracks(client, latest_played_at)
+    songs, play_history = _parse_recent_tracks(recent_tracks)
     SongRepository(database).save_all(songs)
 
-    play_history_repository = PlayHistoryRepository(database)
     initial_count = play_history_repository.count()
     for record in play_history:
         play_history_repository.save(record)
@@ -36,6 +38,31 @@ def main() -> None:
 
     print(f"Imported {imported_count} playback records.")
     print("Database updated successfully.")
+
+
+def _download_recent_tracks(
+    client: SpotifyClient, latest_played_at: datetime | None
+) -> list[dict[str, Any]]:
+    """Download recent tracks, optionally only after the latest stored playback."""
+    if latest_played_at is None:
+        print("First synchronization.")
+        print("Downloading recent playback history...")
+        return client.recent_tracks(limit=50)
+
+    print("Last synchronized playback:")
+    print(latest_played_at.isoformat())
+    print("Checking Spotify...")
+    tracks = client.recent_tracks(
+        limit=50,
+        after=_to_unix_timestamp_ms(latest_played_at),
+    )
+    print(f"Found {len(tracks)} new playback records.")
+    return tracks
+
+
+def _to_unix_timestamp_ms(value: datetime) -> int:
+    """Convert a playback timestamp to the millisecond Unix value Spotify expects."""
+    return int(value.timestamp() * 1000)
 
 
 def _parse_recent_tracks(

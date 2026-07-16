@@ -41,6 +41,16 @@ class PlayHistoryRepository:
 
         return int(row["count"])
 
+    def latest_played_at(self) -> datetime | None:
+        """Return the most recent playback timestamp, if history exists."""
+        with self._database.connection() as connection:
+            row = connection.execute(
+                "SELECT MAX(played_at) AS played_at FROM play_history"
+            ).fetchone()
+
+        played_at = row["played_at"]
+        return datetime.fromisoformat(played_at) if played_at is not None else None
+
     def delete_all(self) -> None:
         """Delete all stored playback-history records."""
         with self._database.connection() as connection:
