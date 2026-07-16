@@ -1,14 +1,16 @@
 # MusicMind AI
 
-MusicMind uses Spotify as a data provider. Sprint 3 authenticates with Spotify,
-imports saved tracks into SQLite, and keeps the app's core data as MusicMind domain models.
+MusicMind uses Spotify as a data provider. The current sprint authenticates with
+Spotify, imports recently played tracks into SQLite, and keeps the app's core data
+as MusicMind domain models.
 
 ## What It Does
 
-After authenticating your Spotify account, the app downloads every saved track and prints:
+After authenticating your Spotify account, the app downloads recently played tracks and
+prints:
 
 - Spotify Login Success
-- Imported song count
+- Imported playback-record count
 - Database update confirmation
 
 ## Requirements
@@ -46,7 +48,7 @@ python main.py
 ```
 
 The app opens Spotify authorization in your browser. After login, Spotify redirects
-back to the local callback server, then the app imports your saved tracks into
+back to the local callback server, then the app imports playback history into
 `music_ai/database/musicmind.db`.
 
 ## Project Structure
@@ -57,11 +59,14 @@ music_ai/
         database.py
         schema.sql
     models/
+        play_history.py
         song.py
         saved_track.py
     parser/
+        spotify_playback_parser.py
         spotify_parser.py
     repository/
+        play_history_repository.py
         song_repository.py
         saved_track_repository.py
     spotify/
@@ -77,4 +82,4 @@ README.md
 ## Scope
 
 This sprint intentionally does not include analytics, GPT integration, Streamlit,
-playback tracking, or any Spotipy dependency.
+incremental synchronization, or any Spotipy dependency.

@@ -14,3 +14,13 @@ CREATE TABLE IF NOT EXISTS saved_tracks (
     PRIMARY KEY (song_id, added_at),
     FOREIGN KEY (song_id) REFERENCES songs(spotify_id)
 );
+
+CREATE TABLE IF NOT EXISTS play_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    song_id TEXT NOT NULL,
+    played_at TEXT NOT NULL,
+    played_duration_ms INTEGER,
+    source TEXT NOT NULL,
+    UNIQUE (song_id, played_at),
+    FOREIGN KEY (song_id) REFERENCES songs(spotify_id)
+);

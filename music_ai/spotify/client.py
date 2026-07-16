@@ -32,6 +32,18 @@ class SpotifyClient:
         )
         return response_data.get("items", [])
 
+    def recent_tracks(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Return the authenticated user's recently played Spotify tracks."""
+        if not 1 <= limit <= 50:
+            raise ValueError("limit must be between 1 and 50.")
+
+        response_data = self._request(
+            "GET",
+            "/me/player/recently-played",
+            params={"limit": limit},
+        )
+        return response_data.get("items", [])
+
     def _request(
         self,
         method: str,

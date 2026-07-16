@@ -2,16 +2,17 @@ from typing import Any
 
 from config import load_spotify_settings
 from music_ai.database.database import Database
-from music_ai.models.saved_track import SavedTrack
-from music_ai.parser.spotify_parser import parse_saved_track
-from music_ai.repository.saved_track_repository import SavedTrackRepository
+from music_ai.models.play_history import PlayHistory
+from music_ai.models.song import Song
+from music_ai.parser.spotify_playback_parser import parse_playback_item
+from music_ai.repository.play_history_repository import PlayHistoryRepository
 from music_ai.repository.song_repository import SongRepository
 from music_ai.spotify.auth import SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 
 
 def main() -> None:
-    """Import the authenticated user's saved Spotify tracks into MusicMind."""
+    """Import the authenticated user's Spotify playback history into MusicMind."""
     settings = load_spotify_settings()
     auth = SpotifyAuth(settings)
     token = auth.authenticate()
@@ -20,49 +21,39 @@ def main() -> None:
     client.current_user()
 
     print("Spotify Login Success")
-    print("Downloading saved tracks...")
-    saved_tracks, skipped_tracks = _parse_saved_tracks(_download_saved_tracks(client))
+    print("Downloading Recently Played...")
+    songs, play_history = _parse_recent_tracks(client.recent_tracks(limit=50))
 
     database = Database()
     database.initialize()
-    SongRepository(database).save_all([saved_track.song for saved_track in saved_tracks])
-    SavedTrackRepository(database).save_all(saved_tracks)
+    SongRepository(database).save_all(songs)
 
-    print(f"Imported {len(saved_tracks)} songs.")
-    if skipped_tracks:
-        print(f"Skipped {skipped_tracks} unavailable or local tracks.")
+    play_history_repository = PlayHistoryRepository(database)
+    initial_count = play_history_repository.count()
+    for record in play_history:
+        play_history_repository.save(record)
+    imported_count = play_history_repository.count() - initial_count
+
+    print(f"Imported {imported_count} playback records.")
     print("Database updated successfully.")
 
 
-def _download_saved_tracks(client: SpotifyClient) -> list[dict[str, Any]]:
-    """Download every page of the current user's saved tracks."""
-    tracks: list[dict[str, Any]] = []
-    page_size = 50
-    offset = 0
-
-    while True:
-        page = client.saved_tracks(limit=page_size, offset=offset)
-        tracks.extend(page)
-
-        if len(page) < page_size:
-            return tracks
-
-        offset += len(page)
-
-
-def _parse_saved_tracks(items: list[dict[str, Any]]) -> tuple[list[SavedTrack], int]:
-    """Convert Spotify saved-track JSON into importable MusicMind objects."""
-    saved_tracks: list[SavedTrack] = []
-    skipped_tracks = 0
-
+def _parse_recent_tracks(
+    items: list[dict[str, Any]],
+) -> tuple[list[Song], list[PlayHistory]]:
+    """Convert Spotify recently played JSON into MusicMind domain models."""
+    songs: list[Song] = []
+    play_history: list[PlayHistory] = []
     for item in items:
-        saved_track = parse_saved_track(item)
-        if saved_track is None:
-            skipped_tracks += 1
+        playback_item = parse_playback_item(item)
+        if playback_item is None:
             continue
-        saved_tracks.append(saved_track)
 
-    return saved_tracks, skipped_tracks
+        song, record = playback_item
+        songs.append(song)
+        play_history.append(record)
+
+    return songs, play_history
 
 
 if __name__ == "__main__":

@@ -13,7 +13,11 @@ from config import SpotifySettings
 
 AUTHORIZATION_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
-DEFAULT_SCOPES = ("user-read-private", "user-library-read")
+DEFAULT_SCOPES = (
+    "user-read-private",
+    "user-library-read",
+    "user-read-recently-played",
+)
 
 
 @dataclass(frozen=True)

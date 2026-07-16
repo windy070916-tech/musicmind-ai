@@ -1,6 +1,7 @@
 """MusicMind domain models."""
 
+from music_ai.models.play_history import PlayHistory
 from music_ai.models.saved_track import SavedTrack
 from music_ai.models.song import Song
 
-__all__ = ["SavedTrack", "Song"]
+__all__ = ["PlayHistory", "SavedTrack", "Song"]
