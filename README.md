@@ -12,6 +12,7 @@ prints:
 - Spotify Login Success
 - Imported playback-record count
 - Database update confirmation
+- Daily listening facts generated from analytics
 
 ## Requirements
 
@@ -58,6 +59,11 @@ music_ai/
     database/
         database.py
         schema.sql
+    analytics/
+        listening_analytics.py
+    knowledge/
+        models.py
+        knowledge_engine.py
     models/
         play_history.py
         song.py
@@ -81,5 +87,8 @@ README.md
 
 ## Scope
 
-This sprint intentionally does not include analytics, GPT integration, Streamlit,
-incremental synchronization, or any Spotipy dependency.
+The Knowledge layer interprets already-calculated analytics into reusable dataclass
+facts. It does not access Spotify, the database, repositories, or analytics internals.
+
+This sprint intentionally does not include GPT integration, Streamlit, trend detection,
+recommendations, or scheduling.
