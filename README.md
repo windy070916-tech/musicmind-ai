@@ -1,8 +1,7 @@
 # MusicMind AI
 
-MusicMind uses Spotify as a data provider. The current sprint authenticates with
-Spotify, imports recently played tracks into SQLite, and keeps the app's core data
-as MusicMind domain models.
+MusicMind imports Spotify listening data, turns analytics into reusable knowledge,
+then uses a configurable LLM provider to write a daily Markdown report.
 
 ## What It Does
 
@@ -13,6 +12,7 @@ prints:
 - Imported playback-record count
 - Database update confirmation
 - Daily listening facts generated from analytics
+- Daily listening trends and an AI-generated report
 
 ## Requirements
 
@@ -34,7 +34,12 @@ http://127.0.0.1:8888/callback
 SPOTIPY_CLIENT_ID=your_client_id
 SPOTIPY_CLIENT_SECRET=your_client_secret
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
+
+Set `LLM_PROVIDER=openai` and provide `OPENAI_API_KEY` to use OpenAI instead.
+Optional `DEEPSEEK_MODEL` and `OPENAI_MODEL` variables override the adapter defaults.
 
 4. Install dependencies:
 
@@ -64,6 +69,13 @@ music_ai/
     knowledge/
         models.py
         knowledge_engine.py
+    ai/
+        base.py
+        prompts.py
+        report_generator.py
+        providers/
+            deepseek.py
+            openai.py
     models/
         play_history.py
         song.py
@@ -88,7 +100,8 @@ README.md
 ## Scope
 
 The Knowledge layer interprets already-calculated analytics into reusable dataclass
-facts. It does not access Spotify, the database, repositories, or analytics internals.
+facts. The AI layer turns those facts into reports through a configured provider; it
+does not access Spotify, databases, repositories, or analytics.
 
-This sprint intentionally does not include GPT integration, Streamlit, trend detection,
-recommendations, or scheduling.
+This sprint intentionally does not include recommendations, an AI DJ, dashboards,
+streaming, conversation memory, or scheduling.
