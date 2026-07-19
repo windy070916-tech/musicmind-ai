@@ -3,6 +3,9 @@
 from music_ai.analytics.listening_analytics import ListeningSummary
 from music_ai.knowledge.models import KnowledgeFact
 
+_FOCUSED_LISTENING_SHARE = 0.5
+_SIGNIFICANT_LISTENING_TIME_CHANGE = 0.5
+
 
 class KnowledgeEngine:
     """Interpret listening summaries without performing analytics."""
@@ -164,6 +167,32 @@ class KnowledgeEngine:
         """Return daily facts; retained as a compatibility alias for Sprint 1."""
         return self.generate_daily_facts()
 
+    def generate_insight_facts(self) -> list[KnowledgeFact]:
+        """Return higher-level behavioral facts interpreted from existing summaries."""
+        facts: list[KnowledgeFact] = []
+        focused_listening_fact = _focused_listening_fact(self._current_summary)
+        if focused_listening_fact is not None:
+            facts.append(focused_listening_fact)
+
+        if self._previous_summary is None:
+            return facts
+
+        listening_time_insight = _listening_time_insight_fact(
+            self._previous_summary.total_listening_time_ms,
+            self._current_summary.total_listening_time_ms,
+        )
+        if listening_time_insight is not None:
+            facts.append(listening_time_insight)
+
+        stable_favorite_fact = _stable_favorite_fact(
+            self._previous_summary,
+            self._current_summary,
+        )
+        if stable_favorite_fact is not None:
+            facts.append(stable_favorite_fact)
+
+        return facts
+
 
 def _listening_time_trend_fact(
     previous_value: int, current_value: int
@@ -230,6 +259,122 @@ def _playback_count_trend_fact(previous_value: int, current_value: int) -> Knowl
         },
         source="listening_summary_comparison",
         insight_type="trend",
+    )
+
+
+def _focused_listening_fact(summary: ListeningSummary) -> KnowledgeFact | None:
+    """Identify when one artist accounts for most of today's listening time."""
+    if summary.total_listening_time_ms <= 0 or not summary.top_artists:
+        return None
+
+    top_artist = summary.top_artists[0]
+    listening_share = top_artist.listening_time_ms / summary.total_listening_time_ms
+    if listening_share <= _FOCUSED_LISTENING_SHARE:
+        return None
+
+    percentage = round(listening_share * 100)
+    return KnowledgeFact(
+        category="focused_listening",
+        importance=3,
+        title="Focused Listening",
+        description=(
+            f"Most of today's listening time ({percentage}%) came from {top_artist.name}."
+        ),
+        metadata={
+            "artist_name": top_artist.name,
+            "artist_listening_time_ms": top_artist.listening_time_ms,
+            "total_listening_time_ms": summary.total_listening_time_ms,
+            "listening_share": listening_share,
+        },
+        confidence=1.0,
+        tags=("behavior", "artist_focus"),
+        source="listening_summary",
+        insight_type="behavior",
+    )
+
+
+def _listening_time_insight_fact(
+    previous_value: int, current_value: int
+) -> KnowledgeFact | None:
+    """Identify substantial day-over-day listening-time increases or decreases."""
+    if previous_value == current_value:
+        return None
+
+    if previous_value == 0:
+        if current_value <= 0:
+            return None
+        return KnowledgeFact(
+            category="heavy_listening",
+            importance=3,
+            title="Heavy Listening",
+            description=(
+                "You listened substantially more than yesterday, when no listening "
+                "time was recorded."
+            ),
+            metadata={
+                "previous_value": previous_value,
+                "current_value": current_value,
+                "percentage_change": None,
+            },
+            confidence=1.0,
+            tags=("trend", "high_listening"),
+            source="listening_summary_comparison",
+            insight_type="trend",
+        )
+
+    change_fraction = (current_value - previous_value) / previous_value
+    if abs(change_fraction) < _SIGNIFICANT_LISTENING_TIME_CHANGE:
+        return None
+
+    percentage = round(abs(change_fraction) * 100)
+    is_heavy_listening = change_fraction > 0
+    category = "heavy_listening" if is_heavy_listening else "light_listening"
+    title = "Heavy Listening" if is_heavy_listening else "Light Listening"
+    comparison = "higher" if is_heavy_listening else "lower"
+    tag = "high_listening" if is_heavy_listening else "low_listening"
+    return KnowledgeFact(
+        category=category,
+        importance=3,
+        title=title,
+        description=f"Your listening time was {percentage}% {comparison} than yesterday.",
+        metadata={
+            "previous_value": previous_value,
+            "current_value": current_value,
+            "percentage_change": round(change_fraction * 100),
+        },
+        confidence=1.0,
+        tags=("trend", tag),
+        source="listening_summary_comparison",
+        insight_type="trend",
+    )
+
+
+def _stable_favorite_fact(
+    previous_summary: ListeningSummary, current_summary: ListeningSummary
+) -> KnowledgeFact | None:
+    """Identify when the same artist remains the top artist across both days."""
+    if not previous_summary.top_artists or not current_summary.top_artists:
+        return None
+
+    previous_artist = previous_summary.top_artists[0]
+    current_artist = current_summary.top_artists[0]
+    if previous_artist.name != current_artist.name:
+        return None
+
+    return KnowledgeFact(
+        category="stable_favorite",
+        importance=2,
+        title="Stable Favorite",
+        description=f"{current_artist.name} remained your top artist today.",
+        metadata={
+            "artist_name": current_artist.name,
+            "previous_value": previous_artist.name,
+            "current_value": current_artist.name,
+        },
+        confidence=1.0,
+        tags=("behavior", "artist_loyalty"),
+        source="listening_summary_comparison",
+        insight_type="behavior",
     )
 
 
