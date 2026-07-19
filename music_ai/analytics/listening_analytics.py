@@ -39,7 +39,7 @@ class ListeningSummary:
 class ListeningAnalytics:
     """Calculate read-only listening analytics from the MusicMind database."""
 
-    def __init__(self, database: Database):
+    def __init__(self, database: Database) -> None:
         """Create an analytics engine that reads from the supplied database."""
         self._database = database
 

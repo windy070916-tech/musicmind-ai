@@ -11,7 +11,7 @@ SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 class SpotifyClient:
     """Reusable client for Spotify Web API requests."""
 
-    def __init__(self, token: SpotifyToken):
+    def __init__(self, token: SpotifyToken) -> None:
         self._token = token
 
     def current_user(self) -> dict[str, Any]:

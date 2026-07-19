@@ -60,6 +60,9 @@ back to the local callback server, then the app imports playback history into
 ## Project Structure
 
 ```text
+docs/
+    architecture.md
+    knowledge.md
 music_ai/
     database/
         database.py
@@ -102,6 +105,9 @@ README.md
 The Knowledge layer interprets already-calculated analytics into reusable dataclass
 facts. The AI layer turns those facts into reports through a configured provider; it
 does not access Spotify, databases, repositories, or analytics.
+
+See `docs/architecture.md` and `docs/knowledge.md` for layer boundaries and
+Knowledge-layer extension guidance.
 
 This sprint intentionally does not include recommendations, an AI DJ, dashboards,
 streaming, conversation memory, or scheduling.

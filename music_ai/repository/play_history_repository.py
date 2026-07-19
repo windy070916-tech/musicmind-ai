@@ -10,7 +10,7 @@ from music_ai.models.play_history import PlayHistory
 class PlayHistoryRepository:
     """Store and retrieve :class:`PlayHistory` domain models."""
 
-    def __init__(self, database: Database):
+    def __init__(self, database: Database) -> None:
         """Create a playback-history repository backed by the supplied database."""
         self._database = database
 

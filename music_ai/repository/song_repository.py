@@ -10,7 +10,7 @@ from music_ai.models.song import Song
 class SongRepository:
     """Store and retrieve :class:`Song` domain models."""
 
-    def __init__(self, database: Database):
+    def __init__(self, database: Database) -> None:
         """Create a song repository backed by the supplied database."""
         self._database = database
 

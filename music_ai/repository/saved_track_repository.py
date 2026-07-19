@@ -12,7 +12,7 @@ from music_ai.models.song import Song
 class SavedTrackRepository:
     """Store and retrieve :class:`SavedTrack` domain models."""
 
-    def __init__(self, database: Database):
+    def __init__(self, database: Database) -> None:
         """Create a saved-track repository backed by the supplied database."""
         self._database = database
 

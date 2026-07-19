@@ -32,7 +32,11 @@ class SpotifyToken:
 class SpotifyAuth:
     """Handles Spotify OAuth authorization and token exchange."""
 
-    def __init__(self, settings: SpotifySettings, scopes: tuple[str, ...] = DEFAULT_SCOPES):
+    def __init__(
+        self,
+        settings: SpotifySettings,
+        scopes: tuple[str, ...] = DEFAULT_SCOPES,
+    ) -> None:
         self._settings = settings
         self._scopes = scopes
 
@@ -83,7 +87,7 @@ class SpotifyAuth:
 
 
 class _CallbackServer:
-    def __init__(self, redirect_uri: str, expected_state: str):
+    def __init__(self, redirect_uri: str, expected_state: str) -> None:
         parsed_uri = urlparse(redirect_uri)
 
         if parsed_uri.scheme != "http":

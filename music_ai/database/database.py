@@ -13,7 +13,7 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 class Database:
     """Manage MusicMind's SQLite database and transactions."""
 
-    def __init__(self, database_path: str | Path = DEFAULT_DATABASE_PATH):
+    def __init__(self, database_path: str | Path = DEFAULT_DATABASE_PATH) -> None:
         """Create a database manager for the given SQLite file."""
         self._database_path = Path(database_path)
 

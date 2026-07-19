@@ -10,7 +10,7 @@ from music_ai.knowledge.models import KnowledgeFact
 class ReportGenerator:
     """Turn knowledge facts into a Markdown report through an LLM provider."""
 
-    def __init__(self, provider: LLMProvider | None = None):
+    def __init__(self, provider: LLMProvider | None = None) -> None:
         """Use an injected provider or create the one selected by configuration."""
         self._provider = provider or create_llm_provider()
 

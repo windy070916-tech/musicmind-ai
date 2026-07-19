@@ -1,7 +1,13 @@
 """Transform listening analytics into reusable knowledge facts."""
 
 from music_ai.analytics.listening_analytics import ListeningSummary
-from music_ai.knowledge.models import KnowledgeFact
+from music_ai.knowledge.models import (
+    FactCategory,
+    FactSource,
+    ImportanceLevel,
+    InsightType,
+    KnowledgeFact,
+)
 
 _FOCUSED_LISTENING_SHARE = 0.5
 _SIGNIFICANT_LISTENING_TIME_CHANGE = 0.5
@@ -14,7 +20,7 @@ class KnowledgeEngine:
         self,
         current_summary: ListeningSummary,
         previous_summary: ListeningSummary | None = None,
-    ):
+    ) -> None:
         """Create an engine for a current summary and an optional comparison period."""
         self._current_summary = current_summary
         self._previous_summary = previous_summary
@@ -23,8 +29,8 @@ class KnowledgeEngine:
         """Return the daily facts supported by the current summary."""
         facts = [
             KnowledgeFact(
-                category="listening_time",
-                importance=2,
+                category=FactCategory.LISTENING_TIME,
+                importance=ImportanceLevel.MEDIUM,
                 title="Listening Time",
                 description=(
                     "You listened to music for "
@@ -33,17 +39,17 @@ class KnowledgeEngine:
                 metadata={
                     "total_listening_time_ms": self._current_summary.total_listening_time_ms,
                 },
-                source="listening_summary",
-                insight_type="daily_listening",
+                source=FactSource.LISTENING_SUMMARY,
+                insight_type=InsightType.DAILY_LISTENING,
             ),
             KnowledgeFact(
-                category="playback_count",
-                importance=2,
+                category=FactCategory.PLAYBACK_COUNT,
+                importance=ImportanceLevel.MEDIUM,
                 title="Playback Count",
                 description=f"You played {self._current_summary.playback_count} tracks today.",
                 metadata={"playback_count": self._current_summary.playback_count},
-                source="listening_summary",
-                insight_type="daily_listening",
+                source=FactSource.LISTENING_SUMMARY,
+                insight_type=InsightType.DAILY_LISTENING,
             ),
         ]
 
@@ -51,16 +57,16 @@ class KnowledgeEngine:
             top_artist = self._current_summary.top_artists[0]
             facts.append(
                 KnowledgeFact(
-                    category="top_artist",
-                    importance=3,
+                    category=FactCategory.TOP_ARTIST,
+                    importance=ImportanceLevel.HIGH,
                     title="Top Artist",
                     description=f"Today's top artist is {top_artist.name}.",
                     metadata={
                         "artist_name": top_artist.name,
                         "listening_time_ms": top_artist.listening_time_ms,
                     },
-                    source="listening_summary",
-                    insight_type="daily_listening",
+                    source=FactSource.LISTENING_SUMMARY,
+                    insight_type=InsightType.DAILY_LISTENING,
                 )
             )
 
@@ -68,8 +74,8 @@ class KnowledgeEngine:
             top_song = self._current_summary.top_songs[0]
             facts.append(
                 KnowledgeFact(
-                    category="top_song",
-                    importance=3,
+                    category=FactCategory.TOP_SONG,
+                    importance=ImportanceLevel.HIGH,
                     title="Top Song",
                     description=f"Today's top song is {top_song.name}.",
                     metadata={
@@ -77,8 +83,8 @@ class KnowledgeEngine:
                         "artist_name": top_song.artist,
                         "listening_time_ms": top_song.listening_time_ms,
                     },
-                    source="listening_summary",
-                    insight_type="daily_listening",
+                    source=FactSource.LISTENING_SUMMARY,
+                    insight_type=InsightType.DAILY_LISTENING,
                 )
             )
 
@@ -118,8 +124,8 @@ class KnowledgeEngine:
             if previous_artist.name != current_artist.name:
                 facts.append(
                     KnowledgeFact(
-                        category="top_artist_change",
-                        importance=3,
+                        category=FactCategory.TOP_ARTIST_CHANGE,
+                        importance=ImportanceLevel.HIGH,
                         title="Top Artist Changed",
                         description=(
                             "Today's top artist changed from "
@@ -129,8 +135,8 @@ class KnowledgeEngine:
                             "previous_value": previous_artist.name,
                             "current_value": current_artist.name,
                         },
-                        source="listening_summary_comparison",
-                        insight_type="trend",
+                        source=FactSource.LISTENING_SUMMARY_COMPARISON,
+                        insight_type=InsightType.TREND,
                     )
                 )
 
@@ -143,8 +149,8 @@ class KnowledgeEngine:
             ):
                 facts.append(
                     KnowledgeFact(
-                        category="top_song_change",
-                        importance=3,
+                        category=FactCategory.TOP_SONG_CHANGE,
+                        importance=ImportanceLevel.HIGH,
                         title="Top Song Changed",
                         description=(
                             "Today's top song changed from "
@@ -156,8 +162,8 @@ class KnowledgeEngine:
                             "previous_artist": previous_song.artist,
                             "current_artist": current_song.artist,
                         },
-                        source="listening_summary_comparison",
-                        insight_type="trend",
+                        source=FactSource.LISTENING_SUMMARY_COMPARISON,
+                        insight_type=InsightType.TREND,
                     )
                 )
 
@@ -209,31 +215,31 @@ def _listening_time_trend_fact(
     }
     if previous_value == 0:
         return KnowledgeFact(
-            category="listening_time_change",
-            importance=2,
+            category=FactCategory.LISTENING_TIME_CHANGE,
+            importance=ImportanceLevel.MEDIUM,
             title="Listening Time Increased",
             description=(
                 "Listening time increased from 0 minutes to "
                 f"{_format_duration(current_value)} compared with yesterday."
             ),
             metadata=metadata,
-            source="listening_summary_comparison",
-            insight_type="trend",
+            source=FactSource.LISTENING_SUMMARY_COMPARISON,
+            insight_type=InsightType.TREND,
         )
 
     percentage_change = round(abs(change) / previous_value * 100)
     metadata["percentage_change"] = percentage_change if change > 0 else -percentage_change
     direction = "increased" if change > 0 else "decreased"
     return KnowledgeFact(
-        category="listening_time_change",
-        importance=2,
+        category=FactCategory.LISTENING_TIME_CHANGE,
+        importance=ImportanceLevel.MEDIUM,
         title=f"Listening Time {direction.title()}",
         description=(
             f"Listening time {direction} by {percentage_change}% compared with yesterday."
         ),
         metadata=metadata,
-        source="listening_summary_comparison",
-        insight_type="trend",
+        source=FactSource.LISTENING_SUMMARY_COMPARISON,
+        insight_type=InsightType.TREND,
     )
 
 
@@ -246,8 +252,8 @@ def _playback_count_trend_fact(previous_value: int, current_value: int) -> Knowl
     track_label = "track" if abs(change) == 1 else "tracks"
     comparison = "more" if change > 0 else "fewer"
     return KnowledgeFact(
-        category="playback_count_change",
-        importance=2,
+        category=FactCategory.PLAYBACK_COUNT_CHANGE,
+        importance=ImportanceLevel.MEDIUM,
         title="Playback Count Changed",
         description=(
             f"You played {abs(change)} {comparison} {track_label} than yesterday."
@@ -257,8 +263,8 @@ def _playback_count_trend_fact(previous_value: int, current_value: int) -> Knowl
             "current_value": current_value,
             "change": change,
         },
-        source="listening_summary_comparison",
-        insight_type="trend",
+        source=FactSource.LISTENING_SUMMARY_COMPARISON,
+        insight_type=InsightType.TREND,
     )
 
 
@@ -274,8 +280,8 @@ def _focused_listening_fact(summary: ListeningSummary) -> KnowledgeFact | None:
 
     percentage = round(listening_share * 100)
     return KnowledgeFact(
-        category="focused_listening",
-        importance=3,
+        category=FactCategory.FOCUSED_LISTENING,
+        importance=ImportanceLevel.HIGH,
         title="Focused Listening",
         description=(
             f"Most of today's listening time ({percentage}%) came from {top_artist.name}."
@@ -288,8 +294,8 @@ def _focused_listening_fact(summary: ListeningSummary) -> KnowledgeFact | None:
         },
         confidence=1.0,
         tags=("behavior", "artist_focus"),
-        source="listening_summary",
-        insight_type="behavior",
+        source=FactSource.LISTENING_SUMMARY,
+        insight_type=InsightType.BEHAVIOR,
     )
 
 
@@ -304,8 +310,8 @@ def _listening_time_insight_fact(
         if current_value <= 0:
             return None
         return KnowledgeFact(
-            category="heavy_listening",
-            importance=3,
+            category=FactCategory.HEAVY_LISTENING,
+            importance=ImportanceLevel.HIGH,
             title="Heavy Listening",
             description=(
                 "You listened substantially more than yesterday, when no listening "
@@ -318,8 +324,8 @@ def _listening_time_insight_fact(
             },
             confidence=1.0,
             tags=("trend", "high_listening"),
-            source="listening_summary_comparison",
-            insight_type="trend",
+            source=FactSource.LISTENING_SUMMARY_COMPARISON,
+            insight_type=InsightType.TREND,
         )
 
     change_fraction = (current_value - previous_value) / previous_value
@@ -328,13 +334,17 @@ def _listening_time_insight_fact(
 
     percentage = round(abs(change_fraction) * 100)
     is_heavy_listening = change_fraction > 0
-    category = "heavy_listening" if is_heavy_listening else "light_listening"
+    category = (
+        FactCategory.HEAVY_LISTENING
+        if is_heavy_listening
+        else FactCategory.LIGHT_LISTENING
+    )
     title = "Heavy Listening" if is_heavy_listening else "Light Listening"
     comparison = "higher" if is_heavy_listening else "lower"
     tag = "high_listening" if is_heavy_listening else "low_listening"
     return KnowledgeFact(
         category=category,
-        importance=3,
+        importance=ImportanceLevel.HIGH,
         title=title,
         description=f"Your listening time was {percentage}% {comparison} than yesterday.",
         metadata={
@@ -344,8 +354,8 @@ def _listening_time_insight_fact(
         },
         confidence=1.0,
         tags=("trend", tag),
-        source="listening_summary_comparison",
-        insight_type="trend",
+        source=FactSource.LISTENING_SUMMARY_COMPARISON,
+        insight_type=InsightType.TREND,
     )
 
 
@@ -362,8 +372,8 @@ def _stable_favorite_fact(
         return None
 
     return KnowledgeFact(
-        category="stable_favorite",
-        importance=2,
+        category=FactCategory.STABLE_FAVORITE,
+        importance=ImportanceLevel.MEDIUM,
         title="Stable Favorite",
         description=f"{current_artist.name} remained your top artist today.",
         metadata={
@@ -373,8 +383,8 @@ def _stable_favorite_fact(
         },
         confidence=1.0,
         tags=("behavior", "artist_loyalty"),
-        source="listening_summary_comparison",
-        insight_type="behavior",
+        source=FactSource.LISTENING_SUMMARY_COMPARISON,
+        insight_type=InsightType.BEHAVIOR,
     )
 
 
