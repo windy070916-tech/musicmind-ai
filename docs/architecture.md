@@ -50,7 +50,9 @@ already-computed summaries into daily facts, trend facts, and insight facts.
 ## Report Generator
 
 The report generator converts structured knowledge facts into a provider-neutral
-prompt. It depends on facts, not on Spotify, repositories, databases, or analytics.
+prompt, validates the returned `DailyBrief` schema, and renders it as Markdown. It
+depends on facts, not on Spotify, repositories, databases, or analytics. The same
+brief object can later be rendered by a web or mobile presentation adapter.
 
 ## LLM Provider
 

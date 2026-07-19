@@ -1,7 +1,7 @@
 # MusicMind AI
 
 MusicMind imports Spotify listening data, turns analytics into reusable knowledge,
-then uses a configurable LLM provider to write a daily Markdown report.
+then uses a configurable LLM provider to write a structured Daily Brief in Markdown.
 
 ## What It Does
 
@@ -12,7 +12,7 @@ prints:
 - Imported playback-record count
 - Database update confirmation
 - Daily listening facts generated from analytics
-- Daily listening trends and an AI-generated report
+- Daily listening trends and an AI-generated Daily Brief
 
 ## Requirements
 
@@ -74,6 +74,8 @@ music_ai/
         knowledge_engine.py
     ai/
         base.py
+        daily_brief.py
+        markdown_renderer.py
         prompts.py
         report_generator.py
         providers/
@@ -109,5 +111,5 @@ does not access Spotify, databases, repositories, or analytics.
 See `docs/architecture.md` and `docs/knowledge.md` for layer boundaries and
 Knowledge-layer extension guidance.
 
-This sprint intentionally does not include recommendations, an AI DJ, dashboards,
-streaming, conversation memory, or scheduling.
+This sprint intentionally does not include a recommendation engine, an AI DJ,
+dashboards, streaming, conversation memory, or scheduling.
