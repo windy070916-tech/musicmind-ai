@@ -24,4 +24,6 @@ jobs:
         run: python -m compileall music_ai
 
       - name: Run tests
-        run: pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest -v
