@@ -54,6 +54,32 @@ class SpotifyClient:
         )
         return response_data.get("items", [])
 
+    def artists(self, spotify_ids: list[str]) -> list[dict[str, Any]]:
+        """Return artist metadata for up to fifty unique Spotify artist identifiers.
+
+        Metadata is optional for synchronization. Network failures and rate limiting
+        therefore produce no metadata rather than failing an otherwise valid import.
+        """
+        unique_ids = list(dict.fromkeys(spotify_ids))
+        if not unique_ids:
+            return []
+        if len(unique_ids) > 50:
+            raise ValueError("artists accepts at most 50 unique Spotify artist identifiers.")
+
+        try:
+            response_data = self._request(
+                "GET",
+                "/artists",
+                params={"ids": ",".join(unique_ids)},
+            )
+        except requests.RequestException:
+            return []
+
+        artists = response_data.get("artists", [])
+        if not isinstance(artists, list):
+            return []
+        return [artist for artist in artists if isinstance(artist, dict)]
+
     def _request(
         self,
         method: str,

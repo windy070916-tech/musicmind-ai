@@ -29,7 +29,7 @@ class SongRepository:
         """Return a song by Spotify identifier, if it exists."""
         with self._database.connection() as connection:
             row = connection.execute(
-                "SELECT spotify_id, name, artists, album, duration_ms, explicit, popularity "
+                "SELECT spotify_id, name, artists, album, album_id, duration_ms, explicit, popularity "
                 "FROM songs WHERE spotify_id = ?",
                 (spotify_id,),
             ).fetchone()
@@ -40,7 +40,7 @@ class SongRepository:
         """Return every stored song."""
         with self._database.connection() as connection:
             rows = connection.execute(
-                "SELECT spotify_id, name, artists, album, duration_ms, explicit, popularity "
+                "SELECT spotify_id, name, artists, album, album_id, duration_ms, explicit, popularity "
                 "FROM songs ORDER BY name"
             ).fetchall()
 
@@ -51,12 +51,13 @@ class SongRepository:
         connection.execute(
             """
             INSERT INTO songs (
-                spotify_id, name, artists, album, duration_ms, explicit, popularity
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                spotify_id, name, artists, album, album_id, duration_ms, explicit, popularity
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(spotify_id) DO UPDATE SET
                 name = excluded.name,
                 artists = excluded.artists,
                 album = excluded.album,
+                album_id = excluded.album_id,
                 duration_ms = excluded.duration_ms,
                 explicit = excluded.explicit,
                 popularity = excluded.popularity
@@ -66,6 +67,7 @@ class SongRepository:
                 song.name,
                 json.dumps(song.artists),
                 song.album,
+                song.album_id,
                 song.duration_ms,
                 int(song.explicit),
                 song.popularity,
@@ -83,4 +85,5 @@ def _song_from_row(row: sqlite3.Row) -> Song:
         duration_ms=row["duration_ms"],
         explicit=bool(row["explicit"]),
         popularity=row["popularity"],
+        album_id=row["album_id"],
     )

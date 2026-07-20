@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from config import load_spotify_settings
@@ -7,11 +7,16 @@ from music_ai.analytics.listening_analytics import ListeningAnalytics, Listening
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
 from music_ai.knowledge.models import KnowledgeFact
+from music_ai.models.artist import Artist
 from music_ai.models.play_history import PlayHistory
 from music_ai.models.song import Song
+from music_ai.models.song_artist import SongArtist
+from music_ai.parser.spotify_parser import parse_artist_metadata
 from music_ai.parser.spotify_playback_parser import parse_playback_item
+from music_ai.repository.artist_repository import ArtistRepository
 from music_ai.repository.play_history_repository import PlayHistoryRepository
 from music_ai.repository.song_repository import SongRepository
+from music_ai.repository.song_artist_repository import SongArtistRepository
 from music_ai.spotify.auth import SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 
@@ -33,7 +38,8 @@ def main() -> None:
     print("Spotify Login Success")
     recent_tracks = _download_recent_tracks(client, latest_played_at)
     songs, play_history = _parse_recent_tracks(recent_tracks)
-    SongRepository(database).save_all(songs)
+    _persist_song_metadata(database, songs)
+    _enrich_artist_metadata(client, database, songs)
 
     initial_count = play_history_repository.count()
     for record in play_history:
@@ -156,6 +162,55 @@ def _parse_recent_tracks(
         play_history.append(record)
 
     return songs, play_history
+
+
+def _persist_song_metadata(database: Database, songs: list[Song]) -> None:
+    """Persist songs and their normalized artist credits for later analytics."""
+    SongRepository(database).save_all(songs)
+    artists = _artists_from_songs(songs)
+    ArtistRepository(database).save_all(artists)
+    SongArtistRepository(database).save_all(_song_artists_from_songs(songs))
+
+
+def _enrich_artist_metadata(
+    client: SpotifyClient, database: Database, songs: list[Song]
+) -> None:
+    """Cache optional artist genres without blocking playback synchronization."""
+    artist_repository = ArtistRepository(database)
+    refresh_before = datetime.now(timezone.utc) - timedelta(days=30)
+    stale_artists = artist_repository.requiring_metadata(
+        [artist.spotify_id for artist in _artists_from_songs(songs)],
+        refresh_before,
+    )
+
+    for artist_batch in _batches(stale_artists, 50):
+        for artist_data in client.artists([artist.spotify_id for artist in artist_batch]):
+            artist = parse_artist_metadata(artist_data)
+            if artist is not None:
+                artist_repository.save_metadata(artist, datetime.now(timezone.utc))
+
+
+def _artists_from_songs(songs: list[Song]) -> list[Artist]:
+    """Return unique artist references parsed from songs that include Spotify IDs."""
+    artists: dict[str, Artist] = {}
+    for song in songs:
+        for artist_id, artist_name in zip(song.artist_ids, song.artists, strict=True):
+            artists[artist_id] = Artist(spotify_id=artist_id, name=artist_name)
+    return list(artists.values())
+
+
+def _song_artists_from_songs(songs: list[Song]) -> list[SongArtist]:
+    """Build ordered normalized artist credits from parsed song metadata."""
+    return [
+        SongArtist(song.spotify_id, artist_id, position)
+        for song in songs
+        for position, artist_id in enumerate(song.artist_ids)
+    ]
+
+
+def _batches(items: list[Artist], size: int) -> list[list[Artist]]:
+    """Split artist metadata requests into Spotify's maximum batch size."""
+    return [items[index : index + size] for index in range(0, len(items), size)]
 
 
 if __name__ == "__main__":

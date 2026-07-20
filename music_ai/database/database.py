@@ -25,6 +25,7 @@ class Database:
         with self.connection() as connection:
             connection.executescript(schema)
             self._allow_nullable_song_popularity(connection)
+            self._add_song_metadata_columns(connection)
 
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:
@@ -45,6 +46,7 @@ class Database:
     def _allow_nullable_song_popularity(self, connection: sqlite3.Connection) -> None:
         """Rebuild old songs tables where popularity was created as NOT NULL."""
         columns = connection.execute("PRAGMA table_info(songs)").fetchall()
+        column_names = {str(column["name"]) for column in columns}
         popularity_column = next(
             (column for column in columns if column["name"] == "popularity"),
             None,
@@ -60,6 +62,7 @@ class Database:
                 name TEXT NOT NULL,
                 artists TEXT NOT NULL,
                 album TEXT NOT NULL,
+                album_id TEXT,
                 duration_ms INTEGER NOT NULL,
                 explicit INTEGER NOT NULL,
                 popularity INTEGER
@@ -67,15 +70,25 @@ class Database:
             """
         )
         connection.execute(
-            """
+            f"""
             INSERT INTO songs_new (
-                spotify_id, name, artists, album, duration_ms, explicit, popularity
+                spotify_id, name, artists, album, album_id, duration_ms, explicit, popularity
             )
             SELECT
-                spotify_id, name, artists, album, duration_ms, explicit, popularity
+                spotify_id, name, artists, album, {"album_id" if "album_id" in column_names else "NULL"},
+                duration_ms, explicit, popularity
             FROM songs
             """
         )
         connection.execute("DROP TABLE songs")
         connection.execute("ALTER TABLE songs_new RENAME TO songs")
         connection.execute("PRAGMA foreign_keys = ON")
+
+    def _add_song_metadata_columns(self, connection: sqlite3.Connection) -> None:
+        """Add metadata columns required by newer MusicMind releases."""
+        column_names = {
+            str(column["name"])
+            for column in connection.execute("PRAGMA table_info(songs)").fetchall()
+        }
+        if "album_id" not in column_names:
+            connection.execute("ALTER TABLE songs ADD COLUMN album_id TEXT")

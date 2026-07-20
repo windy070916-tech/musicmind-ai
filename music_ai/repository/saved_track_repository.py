@@ -37,6 +37,7 @@ class SavedTrackRepository:
                     songs.name,
                     songs.artists,
                     songs.album,
+                    songs.album_id,
                     songs.duration_ms,
                     songs.explicit,
                     songs.popularity,
@@ -67,5 +68,6 @@ def _saved_track_from_row(row: sqlite3.Row) -> SavedTrack:
         duration_ms=row["duration_ms"],
         explicit=bool(row["explicit"]),
         popularity=row["popularity"],
+        album_id=row["album_id"],
     )
     return SavedTrack(song=song, added_at=datetime.fromisoformat(row["added_at"]))

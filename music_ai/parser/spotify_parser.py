@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
+from music_ai.models.artist import Artist
 from music_ai.models.saved_track import SavedTrack
 from music_ai.models.song import Song
 
@@ -17,7 +18,7 @@ def parse_song(track_data: Mapping[str, Any]) -> Song:
         raise ValueError("Spotify track is missing its artists list.")
 
     artists = tuple(
-        _required_string(artist, "name", "Spotify track artist")
+        _artist_reference(artist)
         for artist in artist_data
         if isinstance(artist, Mapping)
     )
@@ -27,11 +28,13 @@ def parse_song(track_data: Mapping[str, Any]) -> Song:
     return Song(
         spotify_id=_required_string(track_data, "id", "Spotify track"),
         name=_required_string(track_data, "name", "Spotify track"),
-        artists=artists,
+        artists=tuple(artist.name for artist in artists),
         album=_required_string(album_data, "name", "Spotify album"),
         duration_ms=_required_integer(track_data, "duration_ms", "Spotify track"),
         explicit=_required_boolean(track_data, "explicit", "Spotify track"),
         popularity=_optional_integer(track_data, "popularity", "Spotify track"),
+        artist_ids=tuple(artist.spotify_id for artist in artists),
+        album_id=_required_string(album_data, "id", "Spotify album"),
     )
 
 
@@ -60,12 +63,43 @@ def parse_saved_track(saved_track_data: Mapping[str, Any]) -> SavedTrack | None:
     return SavedTrack(song=parse_song(track_data), added_at=added_at)
 
 
+def parse_artist_metadata(artist_data: Mapping[str, Any]) -> Artist | None:
+    """Create an artist and optional genres from a Spotify artist response.
+
+    Missing or malformed optional genre data is treated as an empty genre list so
+    metadata enrichment never prevents playback synchronization.
+    """
+    try:
+        artist = _artist_reference(artist_data)
+    except ValueError:
+        return None
+
+    genres_value = artist_data.get("genres", [])
+    if not isinstance(genres_value, list):
+        return artist
+
+    genres = tuple(
+        genre.strip()
+        for genre in genres_value
+        if isinstance(genre, str) and genre.strip()
+    )
+    return Artist(spotify_id=artist.spotify_id, name=artist.name, genres=genres)
+
+
 def _mapping_value(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     """Return a required mapping value from an API response."""
     value = data.get(key)
     if not isinstance(value, Mapping):
         raise ValueError(f"Spotify response is missing a valid '{key}' object.")
     return value
+
+
+def _artist_reference(data: Mapping[str, Any]) -> Artist:
+    """Create an artist reference from a simplified Spotify artist object."""
+    return Artist(
+        spotify_id=_required_string(data, "id", "Spotify track artist"),
+        name=_required_string(data, "name", "Spotify track artist"),
+    )
 
 
 def _required_string(data: Mapping[str, Any], key: str, context: str) -> str:

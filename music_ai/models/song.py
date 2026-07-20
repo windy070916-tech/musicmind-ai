@@ -14,3 +14,5 @@ class Song:
     duration_ms: int
     explicit: bool
     popularity: int | None
+    artist_ids: tuple[str, ...] = ()
+    album_id: str | None = None
