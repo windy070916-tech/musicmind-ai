@@ -49,3 +49,5 @@ CREATE TABLE IF NOT EXISTS play_history (
     UNIQUE (song_id, played_at),
     FOREIGN KEY (song_id) REFERENCES songs(spotify_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);

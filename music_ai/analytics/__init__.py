@@ -6,5 +6,22 @@ from music_ai.analytics.listening_analytics import (
     TopArtist,
     TopSong,
 )
+from music_ai.analytics.listening_profile import (
+    DailyListeningProfile,
+    RankedAlbum,
+    RankedArtist,
+    RankedGenre,
+    RankedTrack,
+)
 
-__all__ = ["ListeningAnalytics", "ListeningSummary", "TopArtist", "TopSong"]
+__all__ = [
+    "DailyListeningProfile",
+    "ListeningAnalytics",
+    "ListeningSummary",
+    "RankedAlbum",
+    "RankedArtist",
+    "RankedGenre",
+    "RankedTrack",
+    "TopArtist",
+    "TopSong",
+]

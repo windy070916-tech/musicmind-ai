@@ -26,6 +26,7 @@ class Database:
             connection.executescript(schema)
             self._allow_nullable_song_popularity(connection)
             self._add_song_metadata_columns(connection)
+            self._add_play_history_indexes(connection)
 
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:
@@ -92,3 +93,10 @@ class Database:
         }
         if "album_id" not in column_names:
             connection.execute("ALTER TABLE songs ADD COLUMN album_id TEXT")
+
+    def _add_play_history_indexes(self, connection: sqlite3.Connection) -> None:
+        """Add read-performance indexes without rebuilding existing tables."""
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_play_history_played_at "
+            "ON play_history(played_at)"
+        )
