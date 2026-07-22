@@ -1,9 +1,11 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from config import load_spotify_settings
 from music_ai.ai.report_generator import ReportGenerator
 from music_ai.analytics.listening_analytics import ListeningAnalytics, ListeningSummary
+from music_ai.analytics.listening_profile import DailyListeningProfile
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
 from music_ai.knowledge.models import KnowledgeFact
@@ -11,12 +13,14 @@ from music_ai.models.artist import Artist
 from music_ai.models.play_history import PlayHistory
 from music_ai.models.song import Song
 from music_ai.models.song_artist import SongArtist
+from music_ai.narrative.engine import NarrativeEngine
 from music_ai.parser.spotify_parser import parse_artist_metadata
 from music_ai.parser.spotify_playback_parser import parse_playback_item
 from music_ai.repository.artist_repository import ArtistRepository
 from music_ai.repository.play_history_repository import PlayHistoryRepository
 from music_ai.repository.song_repository import SongRepository
 from music_ai.repository.song_artist_repository import SongArtistRepository
+from music_ai.presentation.narrative_markdown_renderer import render_daily_narrative
 from music_ai.spotify.auth import SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 
@@ -48,16 +52,17 @@ def main() -> None:
 
     print(f"Imported {imported_count} playback records.")
     print("Database updated successfully.")
-    previous_summary, current_summary = _daily_listening_summaries(database)
+    previous_summary, current_summary, current_profile = _daily_listening_summaries(
+        database
+    )
     knowledge_engine = KnowledgeEngine(current_summary, previous_summary)
     daily_facts = knowledge_engine.generate_daily_facts()
     trend_facts = knowledge_engine.generate_trend_facts()
     insight_facts = knowledge_engine.generate_insight_facts()
-    _print_daily_facts(daily_facts)
-    _print_daily_trends(trend_facts)
-    _print_insight_facts(insight_facts)
-    _print_ai_report(
-        ReportGenerator().generate_daily_report(daily_facts + trend_facts + insight_facts)
+    facts = daily_facts + trend_facts + insight_facts
+    _print_daily_outputs(
+        current_profile,
+        facts,
     )
 
 
@@ -86,17 +91,44 @@ def _to_unix_timestamp_ms(value: datetime) -> int:
     return int(value.timestamp() * 1000)
 
 
-def _daily_listening_summaries(database: Database) -> tuple[ListeningSummary, ListeningSummary]:
-    """Calculate summaries for yesterday and today using local calendar-day ranges."""
-    now = datetime.now().astimezone()
+def _daily_listening_summaries(
+    database: Database,
+    now: datetime | None = None,
+) -> tuple[ListeningSummary, ListeningSummary, DailyListeningProfile]:
+    """Calculate daily summaries and profile from one shared local time range."""
+    now = now or datetime.now().astimezone()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_today = start_of_today + timedelta(days=1)
     start_of_yesterday = start_of_today - timedelta(days=1)
     analytics = ListeningAnalytics(database)
-    return (
-        analytics.get_listening_summary(start_of_yesterday, start_of_today),
-        analytics.get_listening_summary(start_of_today, end_of_today),
+    previous_summary = analytics.get_listening_summary(
+        start_of_yesterday, start_of_today
     )
+    current_summary = analytics.get_listening_summary(start_of_today, end_of_today)
+    current_profile = analytics.get_daily_listening_profile(
+        start_of_today, end_of_today
+    )
+    return previous_summary, current_summary, current_profile
+
+
+def _print_daily_outputs(
+    listening_profile: DailyListeningProfile,
+    facts: list[KnowledgeFact],
+    report_generator_factory: Callable[[], ReportGenerator] = ReportGenerator,
+) -> None:
+    """Print deterministic Narrative output before generating the existing AI report."""
+    narrative = NarrativeEngine(listening_profile, facts).compose()
+    _print_daily_narrative(render_daily_narrative(narrative))
+    report_generator = report_generator_factory()
+    _print_ai_report(report_generator.generate_daily_report(facts))
+
+
+def _print_daily_narrative(report: str) -> None:
+    """Print the deterministic Markdown report produced from DailyNarrative."""
+    print()
+    print("=" * 40)
+    print(report)
+    print("=" * 40)
 
 
 def _print_daily_facts(facts: list[KnowledgeFact]) -> None:

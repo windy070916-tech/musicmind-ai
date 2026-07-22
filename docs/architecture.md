@@ -14,12 +14,14 @@ Analytics
     |
     v
 Knowledge
+    |\
+    | \ Narrative <--- DailyListeningProfile
+    |       |
+    |       v
+    |   Presentation
     |
     v
-Report Generator
-    |
-    v
-LLM Provider
+Report Generator --> LLM Provider
 ```
 
 ## Spotify
@@ -47,12 +49,27 @@ Knowledge converts analytics results into reusable `KnowledgeFact` objects. It d
 not query Spotify, access the database, or calculate analytics. It interprets
 already-computed summaries into daily facts, trend facts, and insight facts.
 
+## Narrative
+
+Narrative combines a `DailyListeningProfile` with already-interpreted
+`KnowledgeFact` objects into the stable `DailyNarrative` product contract. It owns
+composition and deterministic ordering, not analytics, interpretation, rendering,
+or AI generation.
+
+## Presentation
+
+Presentation renders `DailyNarrative` as the deterministic `MusicMind Daily`. It
+formats existing values and descriptions without accessing Spotify, SQLite,
+repositories, Analytics, KnowledgeEngine, or LLM providers.
+
 ## Report Generator
 
 The report generator converts structured knowledge facts into a provider-neutral
 prompt, validates the returned `DailyBrief` schema, and renders it as Markdown. It
 depends on facts, not on Spotify, repositories, databases, or analytics. The same
 brief object can later be rendered by a web or mobile presentation adapter.
+
+The AI report remains separate from the deterministic Narrative presentation path.
 
 ## LLM Provider
 
