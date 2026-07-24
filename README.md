@@ -34,12 +34,15 @@ http://127.0.0.1:8888/callback
 SPOTIPY_CLIENT_ID=your_client_id
 SPOTIPY_CLIENT_SECRET=your_client_secret
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
+MUSICMIND_TIMEZONE=Asia/Shanghai
 LLM_PROVIDER=deepseek
 DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
 
 Set `LLM_PROVIDER=openai` and provide `OPENAI_API_KEY` to use OpenAI instead.
 Optional `DEEPSEEK_MODEL` and `OPENAI_MODEL` variables override the adapter defaults.
+`MUSICMIND_TIMEZONE` is required and must be an IANA timezone name. It defines
+MusicMind's stable local-calendar day for Analytics and Listening Memory.
 
 4. Install dependencies:
 
@@ -69,6 +72,11 @@ music_ai/
         schema.sql
     analytics/
         listening_analytics.py
+        listening_profile.py
+    memory/
+        models.py
+        serializer.py
+        engine.py
     knowledge/
         models.py
         knowledge_engine.py
@@ -89,6 +97,7 @@ music_ai/
         spotify_playback_parser.py
         spotify_parser.py
     repository/
+        listening_memory_repository.py
         play_history_repository.py
         song_repository.py
         saved_track_repository.py

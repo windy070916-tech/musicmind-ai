@@ -51,3 +51,18 @@ CREATE TABLE IF NOT EXISTS play_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
+
+CREATE TABLE IF NOT EXISTS listening_memory_snapshots (
+    local_date TEXT NOT NULL,
+    timezone_name TEXT NOT NULL,
+    period_start_utc TEXT NOT NULL,
+    period_end_utc TEXT NOT NULL,
+    snapshot_version INTEGER NOT NULL CHECK (snapshot_version > 0),
+    generated_at_utc TEXT NOT NULL,
+    is_closed INTEGER NOT NULL CHECK (is_closed IN (0, 1)),
+    profile_payload TEXT NOT NULL,
+    PRIMARY KEY (local_date, timezone_name, snapshot_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_listening_memory_range
+ON listening_memory_snapshots(timezone_name, snapshot_version, local_date);

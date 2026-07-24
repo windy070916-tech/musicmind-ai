@@ -92,7 +92,9 @@ def test_daily_summary_and_profile_share_exact_current_boundaries(monkeypatch) -
     monkeypatch.setattr(main, "ListeningAnalytics", FakeListeningAnalytics)
     now = datetime(2026, 7, 22, 15, 30, tzinfo=timezone.utc)
 
-    previous, current, current_profile = main._daily_listening_summaries(object(), now)
+    previous, current, current_profile = main._daily_listening_summaries(
+        object(), "UTC", now
+    )
 
     assert previous is empty_summary
     assert current is empty_summary

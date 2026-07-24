@@ -1,14 +1,16 @@
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from config import load_spotify_settings
+from config import load_musicmind_timezone, load_spotify_settings
 from music_ai.ai.report_generator import ReportGenerator
 from music_ai.analytics.listening_analytics import ListeningAnalytics, ListeningSummary
 from music_ai.analytics.listening_profile import DailyListeningProfile
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
 from music_ai.knowledge.models import KnowledgeFact
+from music_ai.memory.engine import MemoryEngine
 from music_ai.models.artist import Artist
 from music_ai.models.play_history import PlayHistory
 from music_ai.models.song import Song
@@ -17,6 +19,9 @@ from music_ai.narrative.engine import NarrativeEngine
 from music_ai.parser.spotify_parser import parse_artist_metadata
 from music_ai.parser.spotify_playback_parser import parse_playback_item
 from music_ai.repository.artist_repository import ArtistRepository
+from music_ai.repository.listening_memory_repository import (
+    ListeningMemoryRepository,
+)
 from music_ai.repository.play_history_repository import PlayHistoryRepository
 from music_ai.repository.song_repository import SongRepository
 from music_ai.repository.song_artist_repository import SongArtistRepository
@@ -28,6 +33,7 @@ from music_ai.spotify.client import SpotifyClient
 def main() -> None:
     """Import the authenticated user's Spotify playback history into MusicMind."""
     settings = load_spotify_settings()
+    timezone_name = load_musicmind_timezone()
     auth = SpotifyAuth(settings)
     token = auth.authenticate()
 
@@ -52,9 +58,13 @@ def main() -> None:
 
     print(f"Imported {imported_count} playback records.")
     print("Database updated successfully.")
+    analytics_time = datetime.now(timezone.utc)
     previous_summary, current_summary, current_profile = _daily_listening_summaries(
-        database
+        database,
+        timezone_name,
+        analytics_time,
     )
+    _capture_current_memory(database, timezone_name, analytics_time)
     knowledge_engine = KnowledgeEngine(current_summary, previous_summary)
     daily_facts = knowledge_engine.generate_daily_facts()
     trend_facts = knowledge_engine.generate_trend_facts()
@@ -93,13 +103,22 @@ def _to_unix_timestamp_ms(value: datetime) -> int:
 
 def _daily_listening_summaries(
     database: Database,
+    timezone_name: str,
     now: datetime | None = None,
 ) -> tuple[ListeningSummary, ListeningSummary, DailyListeningProfile]:
     """Calculate daily summaries and profile from one shared local time range."""
-    now = now or datetime.now().astimezone()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_today = start_of_today + timedelta(days=1)
-    start_of_yesterday = start_of_today - timedelta(days=1)
+    zone = ZoneInfo(timezone_name)
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None or current_time.utcoffset() is None:
+        raise ValueError("Daily analytics time must be timezone-aware.")
+    local_date = current_time.astimezone(zone).date()
+    start_of_today = datetime.combine(local_date, time.min, tzinfo=zone)
+    end_of_today = datetime.combine(
+        local_date + timedelta(days=1), time.min, tzinfo=zone
+    )
+    start_of_yesterday = datetime.combine(
+        local_date - timedelta(days=1), time.min, tzinfo=zone
+    )
     analytics = ListeningAnalytics(database)
     previous_summary = analytics.get_listening_summary(
         start_of_yesterday, start_of_today
@@ -109,6 +128,19 @@ def _daily_listening_summaries(
         start_of_today, end_of_today
     )
     return previous_summary, current_summary, current_profile
+
+
+def _capture_current_memory(
+    database: Database, timezone_name: str, generated_at: datetime
+) -> None:
+    """Persist only the current local-calendar profile after synchronization."""
+    engine = MemoryEngine(
+        ListeningAnalytics(database),
+        ListeningMemoryRepository(database),
+        timezone_name,
+        clock=lambda: generated_at,
+    )
+    engine.capture_current_day()
 
 
 def _print_daily_outputs(

@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.quickSuggestionsDelay": 5000,
+		"editor.hover.enabled": "off",
+		"editor.hover.delay": 5000,
+		"editor.hover.hidingDelay": 5000
+	}
+}

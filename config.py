@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from os import getenv
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
 
@@ -37,3 +38,21 @@ def load_spotify_settings() -> SpotifySettings:
         client_secret=client_secret,
         redirect_uri=redirect_uri,
     )
+
+
+def load_musicmind_timezone() -> str:
+    """Return the configured canonical IANA timezone name."""
+    load_dotenv()
+    timezone_name = getenv("MUSICMIND_TIMEZONE")
+    if not timezone_name:
+        raise RuntimeError(
+            "Missing required environment variable: MUSICMIND_TIMEZONE"
+        )
+
+    try:
+        ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError as error:
+        raise RuntimeError(
+            "MUSICMIND_TIMEZONE must be a valid IANA timezone name."
+        ) from error
+    return timezone_name

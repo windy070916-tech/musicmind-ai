@@ -10,7 +10,10 @@ Spotify
 Repository
     |
     v
-Analytics
+SQLite play_history
+    |
+    v
+Analytics --------> Memory --------> SQLite derived snapshots
     |
     v
 Knowledge
@@ -42,6 +45,19 @@ Analytics reads repository-backed data and calculates listening statistics, such
 total listening time, playback count, top songs, and top artists. It produces
 `ListeningSummary` objects and does not interpret those values as user-facing
 insights.
+
+## Memory
+
+Memory persists versioned, immutable daily `DailyListeningProfile` snapshots for
+explicit local-calendar dates. Raw `play_history` remains authoritative, and every
+Memory snapshot is safe to delete and rebuild. Snapshot identity includes the
+configured IANA timezone and an explicit contract version.
+
+Runtime refreshes only the current date after synchronization. Bounded reads are
+side-effect free and preserve missing dates as gaps; historical generation occurs
+only through an explicit rebuild. Memory does not calculate Analytics, interpret
+behavior, produce prose, or call Spotify or an LLM. It does not yet feed Knowledge,
+Narrative, Presentation, or the AI report.
 
 ## Knowledge
 
