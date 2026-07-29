@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -10,6 +10,7 @@ from music_ai.analytics.listening_profile import DailyListeningProfile
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
 from music_ai.knowledge.models import KnowledgeFact
+from music_ai.knowledge.recent_knowledge_engine import RecentKnowledgeEngine
 from music_ai.memory.engine import MemoryEngine
 from music_ai.models.artist import Artist
 from music_ai.models.play_history import PlayHistory
@@ -28,6 +29,11 @@ from music_ai.repository.song_artist_repository import SongArtistRepository
 from music_ai.presentation.narrative_markdown_renderer import render_daily_narrative
 from music_ai.spotify.auth import SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
+from music_ai.temporal.analytics import TemporalListeningAnalytics
+
+
+_RECENT_WINDOW_DAYS = 7
+_COMPARISON_WINDOW_DAYS = 7
 
 
 def main() -> None:
@@ -64,7 +70,14 @@ def main() -> None:
         timezone_name,
         analytics_time,
     )
-    _capture_current_memory(database, timezone_name, analytics_time)
+    memory_engine = _capture_current_memory(
+        database, timezone_name, analytics_time
+    )
+    recent_facts = _recent_listening_facts(
+        memory_engine,
+        timezone_name,
+        analytics_time,
+    )
     knowledge_engine = KnowledgeEngine(current_summary, previous_summary)
     daily_facts = knowledge_engine.generate_daily_facts()
     trend_facts = knowledge_engine.generate_trend_facts()
@@ -73,6 +86,7 @@ def main() -> None:
     _print_daily_outputs(
         current_profile,
         facts,
+        recent_facts=recent_facts,
     )
 
 
@@ -132,7 +146,7 @@ def _daily_listening_summaries(
 
 def _capture_current_memory(
     database: Database, timezone_name: str, generated_at: datetime
-) -> None:
+) -> MemoryEngine:
     """Persist only the current local-calendar profile after synchronization."""
     engine = MemoryEngine(
         ListeningAnalytics(database),
@@ -141,15 +155,53 @@ def _capture_current_memory(
         clock=lambda: generated_at,
     )
     engine.capture_current_day()
+    return engine
+
+
+def _recent_listening_facts(
+    memory_engine: MemoryEngine,
+    timezone_name: str,
+    as_of: datetime,
+) -> list[KnowledgeFact]:
+    """Build recent facts from explicit application-owned calendar windows."""
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("Recent analysis time must be timezone-aware.")
+    local_date = as_of.astimezone(ZoneInfo(timezone_name)).date()
+    recent_end_date = local_date + timedelta(days=1)
+    recent_start_date = recent_end_date - timedelta(
+        days=_RECENT_WINDOW_DAYS
+    )
+    comparison_end_date = recent_start_date
+    comparison_start_date = comparison_end_date - timedelta(
+        days=_COMPARISON_WINDOW_DAYS
+    )
+    memory = memory_engine.load_range(
+        comparison_start_date,
+        recent_end_date,
+    )
+    evidence = TemporalListeningAnalytics().analyze(
+        memory,
+        recent_start_date=recent_start_date,
+        recent_end_date=recent_end_date,
+        comparison_start_date=comparison_start_date,
+        comparison_end_date=comparison_end_date,
+        timezone_name=timezone_name,
+        as_of=as_of,
+    )
+    return RecentKnowledgeEngine(evidence).generate_facts()
 
 
 def _print_daily_outputs(
     listening_profile: DailyListeningProfile,
     facts: list[KnowledgeFact],
     report_generator_factory: Callable[[], ReportGenerator] = ReportGenerator,
+    *,
+    recent_facts: Sequence[KnowledgeFact] = (),
 ) -> None:
     """Print deterministic Narrative output before generating the existing AI report."""
-    narrative = NarrativeEngine(listening_profile, facts).compose()
+    narrative = NarrativeEngine(
+        listening_profile, (*facts, *recent_facts)
+    ).compose()
     _print_daily_narrative(render_daily_narrative(narrative))
     report_generator = report_generator_factory()
     _print_ai_report(report_generator.generate_daily_report(facts))

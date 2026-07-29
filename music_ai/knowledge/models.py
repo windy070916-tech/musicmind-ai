@@ -21,6 +21,8 @@ class FactCategory(StrEnum):
     HEAVY_LISTENING = "heavy_listening"
     LIGHT_LISTENING = "light_listening"
     STABLE_FAVORITE = "stable_favorite"
+    ARTIST_CONTINUITY = "artist_continuity"
+    ARTIST_EMERGENCE = "artist_emergence"
 
 
 class InsightType(StrEnum):
@@ -44,6 +46,15 @@ class FactSource(StrEnum):
 
     LISTENING_SUMMARY = "listening_summary"
     LISTENING_SUMMARY_COMPARISON = "listening_summary_comparison"
+    RECENT_LISTENING_EVIDENCE = "recent_listening_evidence"
+
+
+class FactTimeHorizon(StrEnum):
+    """Explicit period horizon represented by a knowledge fact."""
+
+    DAILY = "daily"
+    RECENT = "recent"
+    LONG_TERM = "long_term"
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +76,7 @@ class KnowledgeFact:
     date_range: tuple[str, str] | None = None
     severity: str | None = None
     insight_type: InsightType | str | None = None
+    time_horizon: FactTimeHorizon | str = FactTimeHorizon.DAILY
 
     def __post_init__(self) -> None:
         """Protect metadata so a fact remains immutable after construction."""

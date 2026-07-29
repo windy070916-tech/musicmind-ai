@@ -1,18 +1,22 @@
 # MusicMind AI
 
-MusicMind imports Spotify listening data, turns analytics into reusable knowledge,
-then uses a configurable LLM provider to write a structured Daily Brief in Markdown.
+MusicMind imports Spotify listening data and builds deterministic daily and recent
+listening intelligence. Analytics produces statistics, Listening Memory preserves
+versioned daily evidence, Temporal Analytics compares caller-selected periods,
+Knowledge interprets evidence, and Narrative composes the deterministic product
+output. A configurable LLM report remains a separate enhancement path.
 
 ## What It Does
 
-After authenticating your Spotify account, the app downloads recently played tracks and
-prints:
+After authenticating your Spotify account, the app downloads recently played tracks,
+refreshes the current local-day Memory snapshot, and prints:
 
 - Spotify Login Success
 - Imported playback-record count
 - Database update confirmation
-- Daily listening facts generated from analytics
-- Daily listening trends and an AI-generated Daily Brief
+- A deterministic `MusicMind Daily` with the current profile and supported recent
+  observations
+- A separate AI-generated Daily Brief
 
 ## Requirements
 
@@ -66,6 +70,9 @@ back to the local callback server, then the app imports playback history into
 docs/
     architecture.md
     knowledge.md
+    memory.md
+    narrative.md
+    temporal.md
 music_ai/
     database/
         database.py
@@ -77,9 +84,18 @@ music_ai/
         models.py
         serializer.py
         engine.py
+    temporal/
+        models.py
+        analytics.py
     knowledge/
         models.py
         knowledge_engine.py
+        recent_knowledge_engine.py
+    narrative/
+        models.py
+        engine.py
+    presentation/
+        narrative_markdown_renderer.py
     ai/
         base.py
         daily_brief.py
@@ -113,12 +129,22 @@ README.md
 
 ## Scope
 
-The Knowledge layer interprets already-calculated analytics into reusable dataclass
-facts. The AI layer turns those facts into reports through a configured provider; it
-does not access Spotify, databases, repositories, or analytics.
+Raw playback history remains authoritative. Analytics calculates deterministic
+daily profiles, while Listening Memory stores rebuildable daily snapshots. Temporal
+Analytics reads explicit bounded Memory ranges and produces immutable evidence for
+artist continuity and artist emergence. It owns no default period, persistence
+lifecycle, prose, or product-meaning thresholds.
 
-See `docs/architecture.md` and `docs/knowledge.md` for layer boundaries and
-Knowledge-layer extension guidance.
+Knowledge interprets analytics and temporal evidence into reusable dataclass facts.
+Narrative then selects and organizes those facts for deterministic Presentation.
+The AI layer turns the existing non-recent fact collection into a separate report
+through a configured provider; it does not access Spotify, databases, repositories,
+Analytics, Memory, or Temporal Analytics.
+
+See `docs/architecture.md`, `docs/memory.md`, `docs/temporal.md`,
+`docs/knowledge.md`, and `docs/narrative.md` for layer boundaries and extension
+guidance.
 
 This sprint intentionally does not include a recommendation engine, an AI DJ,
-dashboards, streaming, conversation memory, or scheduling.
+dashboards, streaming, conversation memory, long-term preference classification, or
+scheduling.

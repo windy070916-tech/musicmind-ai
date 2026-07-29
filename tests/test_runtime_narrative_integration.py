@@ -1,15 +1,17 @@
 """Isolated tests for Narrative and AI runtime coexistence."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import main
 from music_ai.analytics import DailyListeningProfile, ListeningSummary
 from music_ai.knowledge import (
     FactCategory,
+    FactTimeHorizon,
     ImportanceLevel,
     InsightType,
     KnowledgeFact,
 )
+from music_ai.memory import ListeningMemory
 
 
 def _profile() -> DailyListeningProfile:
@@ -53,11 +55,29 @@ def test_daily_outputs_print_narrative_before_constructing_and_calling_ai(monkey
         events.append("construct_ai")
         return FakeReportGenerator()
 
-    monkeypatch.setattr(main, "_print_daily_narrative", lambda report: events.append(("daily", report)))
-    monkeypatch.setattr(main, "_print_ai_report", lambda report: events.append(("ai", report)))
-    monkeypatch.setattr(main, "_print_daily_facts", lambda _facts: events.append("raw_daily"))
-    monkeypatch.setattr(main, "_print_daily_trends", lambda _facts: events.append("raw_trends"))
-    monkeypatch.setattr(main, "_print_insight_facts", lambda _facts: events.append("raw_insights"))
+    monkeypatch.setattr(
+        main,
+        "_print_daily_narrative",
+        lambda report: events.append(("daily", report)),
+    )
+    monkeypatch.setattr(
+        main,
+        "_print_ai_report",
+        lambda report: events.append(("ai", report)),
+    )
+    monkeypatch.setattr(
+        main, "_print_daily_facts", lambda _facts: events.append("raw_daily")
+    )
+    monkeypatch.setattr(
+        main,
+        "_print_daily_trends",
+        lambda _facts: events.append("raw_trends"),
+    )
+    monkeypatch.setattr(
+        main,
+        "_print_insight_facts",
+        lambda _facts: events.append("raw_insights"),
+    )
 
     main._print_daily_outputs(_profile(), facts, factory)
 
@@ -68,6 +88,74 @@ def test_daily_outputs_print_narrative_before_constructing_and_calling_ai(monkey
     assert "raw_daily" not in events
     assert "raw_trends" not in events
     assert "raw_insights" not in events
+
+
+def test_recent_facts_render_but_do_not_change_existing_ai_input(
+    monkeypatch,
+) -> None:
+    events: list[object] = []
+    daily_facts = [_fact()]
+    recent_fact = KnowledgeFact(
+        category=FactCategory.ARTIST_EMERGENCE,
+        importance=ImportanceLevel.HIGH,
+        title="Artist Emergence",
+        description="Artist One grew in your recent listening.",
+        insight_type=InsightType.BEHAVIOR,
+        time_horizon=FactTimeHorizon.RECENT,
+    )
+
+    class FakeReportGenerator:
+        def generate_daily_report(self, received_facts):
+            events.append(("generate_ai", received_facts))
+            return "AI report"
+
+    monkeypatch.setattr(
+        main,
+        "_print_daily_narrative",
+        lambda report: events.append(("daily", report)),
+    )
+    monkeypatch.setattr(
+        main, "_print_ai_report", lambda report: events.append(("ai", report))
+    )
+
+    main._print_daily_outputs(
+        _profile(),
+        daily_facts,
+        lambda: FakeReportGenerator(),
+        recent_facts=(recent_fact,),
+    )
+
+    assert "## Recently" in events[0][1]
+    assert recent_fact.description in events[0][1]
+    assert events[1] == ("generate_ai", daily_facts)
+    assert events[2] == ("ai", "AI report")
+
+
+def test_runtime_supplies_explicit_recent_and_comparison_windows() -> None:
+    calls: list[tuple[date, date]] = []
+    as_of = datetime(2026, 7, 24, 8, tzinfo=timezone.utc)
+
+    class FakeMemoryEngine:
+        def load_range(
+            self, start_date: date, end_date: date
+        ) -> ListeningMemory:
+            calls.append((start_date, end_date))
+            return ListeningMemory(
+                start_date=start_date,
+                end_date=end_date,
+                timezone_name="Asia/Shanghai",
+                snapshots=(),
+                as_of=as_of,
+            )
+
+    facts = main._recent_listening_facts(
+        FakeMemoryEngine(),  # type: ignore[arg-type]
+        "Asia/Shanghai",
+        as_of,
+    )
+
+    assert calls == [(date(2026, 7, 11), date(2026, 7, 25))]
+    assert facts == []
 
 
 def test_daily_summary_and_profile_share_exact_current_boundaries(monkeypatch) -> None:

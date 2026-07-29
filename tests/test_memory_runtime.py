@@ -150,18 +150,33 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
 
     captured = []
     monkeypatch.setattr(main, "_daily_listening_summaries", summaries)
+
+    def capture_memory(_database, timezone_name, _now):
+        events.append("memory_captured")
+        captured.append(timezone_name)
+        return object()
+
     monkeypatch.setattr(
         main,
         "_capture_current_memory",
-        lambda _database, timezone_name, _now: (
-            events.append("memory_captured"),
-            captured.append(timezone_name),
-        ),
+        capture_memory,
     )
 
-    def output(received_profile, facts):
+    def recent_facts(_engine, timezone_name, _now):
+        events.append("recent_analysis")
+        captured.append(timezone_name)
+        return []
+
+    monkeypatch.setattr(
+        main,
+        "_recent_listening_facts",
+        recent_facts,
+    )
+
+    def output(received_profile, facts, *, recent_facts):
         events.append("product_output")
         assert received_profile is profile
+        assert recent_facts == []
         captured.append(tuple(facts))
 
     monkeypatch.setattr(main, "_print_daily_outputs", output)
@@ -172,10 +187,12 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
     assert events.index("metadata_enriched") < events.index("memory_captured")
     assert events.index("raw_playback_saved") < events.index("memory_captured")
     assert events.index("daily_analytics") < events.index("memory_captured")
+    assert events.index("memory_captured") < events.index("recent_analysis")
     assert events.index("memory_captured") < events.index("product_output")
     assert events.count("memory_captured") == 1
     assert captured[0] == "Asia/Shanghai"
-    assert [fact.category for fact in captured[1]] == [
+    assert captured[1] == "Asia/Shanghai"
+    assert [fact.category for fact in captured[2]] == [
         "listening_time",
         "playback_count",
     ]

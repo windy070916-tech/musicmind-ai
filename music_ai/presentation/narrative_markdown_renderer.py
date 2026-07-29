@@ -88,6 +88,17 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
                 )
             )
 
+    if narrative.recent_thread is not None:
+        sections.extend(
+            (
+                "## Recently",
+                "\n".join(
+                    f"- {fact.description}"
+                    for fact in narrative.recent_thread.observations
+                ),
+            )
+        )
+
     highlights = tuple(_eligible_highlights(narrative.highlights))[:3]
     if highlights:
         sections.extend(
