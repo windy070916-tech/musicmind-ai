@@ -8,7 +8,11 @@ from music_ai.knowledge.models import (
     FactTimeHorizon,
     KnowledgeFact,
 )
-from music_ai.narrative.models import DailyNarrative, RecentListeningThread
+from music_ai.narrative.models import (
+    DailyNarrative,
+    LongTermListeningThread,
+    RecentListeningThread,
+)
 
 
 class NarrativeEngine:
@@ -30,17 +34,20 @@ class NarrativeEngine:
                 (
                     fact
                     for fact in self._facts
-                    if fact.time_horizon != FactTimeHorizon.RECENT
+                    if fact.time_horizon
+                    not in {FactTimeHorizon.RECENT, FactTimeHorizon.LONG_TERM}
                 ),
                 key=_fact_order,
             )
         )
         recent_thread = _recent_thread(self._facts)
+        long_term_thread = _long_term_thread(self._facts, recent_thread)
         return DailyNarrative(
             headline="Daily Listening",
             listening_profile=self._listening_profile,
             highlights=highlights,
             recent_thread=recent_thread,
+            long_term_thread=long_term_thread,
         )
 
 
@@ -91,6 +98,68 @@ def _recent_fact_order(
         FactCategory.ARTIST_EMERGENCE: 0,
         FactCategory.ARTIST_CONTINUITY: 1,
     }.get(fact.category, 2)
+    return (
+        category_priority,
+        -int(fact.importance),
+        str(fact.category),
+        fact.title,
+        fact.description,
+    )
+
+
+def _long_term_thread(
+    facts: tuple[KnowledgeFact, ...],
+    recent_thread: RecentListeningThread | None,
+) -> LongTermListeningThread | None:
+    """Select long-term facts after exact cross-horizon deduplication."""
+    seen_pairs = {
+        pair
+        for fact in (recent_thread.observations if recent_thread else ())
+        if (pair := _fact_pair(fact)) is not None
+    }
+    observations: list[KnowledgeFact] = []
+    for fact in sorted(
+        (
+            candidate
+            for candidate in facts
+            if candidate.time_horizon == FactTimeHorizon.LONG_TERM
+        ),
+        key=_long_term_fact_order,
+    ):
+        pair = _fact_pair(fact)
+        if pair is not None and pair in seen_pairs:
+            continue
+        if pair is not None:
+            seen_pairs.add(pair)
+        observations.append(fact)
+        if len(observations) == 2:
+            break
+    if not observations:
+        return None
+    return LongTermListeningThread(tuple(observations))
+
+
+def _fact_pair(fact: KnowledgeFact) -> tuple[str, str] | None:
+    subject = fact.metadata.get("subject_key")
+    concept = fact.metadata.get("concept_key")
+    if (
+        isinstance(subject, str)
+        and subject
+        and isinstance(concept, str)
+        and concept
+    ):
+        return subject, concept
+    return None
+
+
+def _long_term_fact_order(
+    fact: KnowledgeFact,
+) -> tuple[int, int, str, str, str]:
+    category_priority = {
+        FactCategory.ARTIST_CONSISTENCY: 0,
+        FactCategory.ARTIST_BREADTH: 1,
+        FactCategory.LISTENING_CONCENTRATION: 2,
+    }.get(fact.category, 3)
     return (
         category_priority,
         -int(fact.importance),

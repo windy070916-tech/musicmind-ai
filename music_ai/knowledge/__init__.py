@@ -1,6 +1,7 @@
 """Structured knowledge derived from MusicMind analytics."""
 
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
+from music_ai.knowledge.long_term_knowledge_engine import LongTermKnowledgeEngine
 from music_ai.knowledge.models import (
     FactCategory,
     FactSource,
@@ -19,5 +20,6 @@ __all__ = [
     "InsightType",
     "KnowledgeEngine",
     "KnowledgeFact",
+    "LongTermKnowledgeEngine",
     "RecentKnowledgeEngine",
 ]

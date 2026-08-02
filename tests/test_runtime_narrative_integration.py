@@ -131,6 +131,51 @@ def test_recent_facts_render_but_do_not_change_existing_ai_input(
     assert events[2] == ("ai", "AI report")
 
 
+def test_long_term_facts_render_but_do_not_change_existing_ai_input(
+    monkeypatch,
+) -> None:
+    events: list[object] = []
+    daily_facts = [_fact()]
+    long_term_fact = KnowledgeFact(
+        category=FactCategory.ARTIST_BREADTH,
+        importance=ImportanceLevel.HIGH,
+        title="Artist breadth",
+        description="You listened to 20 artists across 16 recorded listening days.",
+        metadata={
+            "subject_key": "listening:all_artists",
+            "concept_key": "artist_breadth",
+        },
+        insight_type=InsightType.BEHAVIOR,
+        time_horizon=FactTimeHorizon.LONG_TERM,
+    )
+
+    class FakeReportGenerator:
+        def generate_daily_report(self, received_facts):
+            events.append(("generate_ai", received_facts))
+            return "AI report"
+
+    monkeypatch.setattr(
+        main,
+        "_print_daily_narrative",
+        lambda report: events.append(("daily", report)),
+    )
+    monkeypatch.setattr(
+        main, "_print_ai_report", lambda report: events.append(("ai", report))
+    )
+
+    main._print_daily_outputs(
+        _profile(),
+        daily_facts,
+        lambda: FakeReportGenerator(),
+        long_term_facts=(long_term_fact,),
+    )
+
+    assert "## Over Time" in events[0][1]
+    assert long_term_fact.description in events[0][1]
+    assert events[1] == ("generate_ai", daily_facts)
+    assert events[2] == ("ai", "AI report")
+
+
 def test_runtime_supplies_explicit_recent_and_comparison_windows() -> None:
     calls: list[tuple[date, date]] = []
     as_of = datetime(2026, 7, 24, 8, tzinfo=timezone.utc)
@@ -156,6 +201,34 @@ def test_runtime_supplies_explicit_recent_and_comparison_windows() -> None:
 
     assert calls == [(date(2026, 7, 11), date(2026, 7, 25))]
     assert facts == []
+
+
+def test_runtime_loads_one_range_and_supplies_explicit_long_term_window() -> None:
+    calls: list[tuple[date, date]] = []
+    as_of = datetime(2026, 7, 24, 8, tzinfo=timezone.utc)
+
+    class FakeMemoryEngine:
+        def load_range(
+            self, start_date: date, end_date: date
+        ) -> ListeningMemory:
+            calls.append((start_date, end_date))
+            return ListeningMemory(
+                start_date=start_date,
+                end_date=end_date,
+                timezone_name="Asia/Shanghai",
+                snapshots=(),
+                as_of=as_of,
+            )
+
+    recent, long_term = main._longitudinal_listening_facts(
+        FakeMemoryEngine(),  # type: ignore[arg-type]
+        "Asia/Shanghai",
+        as_of,
+    )
+
+    assert calls == [(date(2026, 6, 24), date(2026, 7, 25))]
+    assert recent == []
+    assert long_term == ()
 
 
 def test_daily_summary_and_profile_share_exact_current_boundaries(monkeypatch) -> None:

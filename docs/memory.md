@@ -19,8 +19,9 @@ record.
 
 ## Lifecycle
 
-`MemoryEngine.capture_current_day()` refreshes only the current configured local
-date after raw synchronization succeeds. Repeated capture replaces the same
+After raw synchronization succeeds, runtime explicitly captures the previous local
+date so it has closed-day evidence, then `MemoryEngine.capture_current_day()`
+refreshes the current configured local date. Repeated capture replaces the same
 date/timezone/version row.
 
 Range reads are side-effect free. They return only stored snapshots, leave missing
@@ -29,6 +30,20 @@ only through an explicit bounded `rebuild_range()` operation.
 
 Malformed or unsupported snapshots are invalid derived cache data. They may be
 replaced through capture or rebuilding without changing raw playback history.
+
+## Explicit historical rebuild
+
+Historical backfill is never automatic. An operator or maintenance entry point must
+construct the normal `MemoryEngine` and call its existing bounded API explicitly:
+
+```python
+memory = memory_engine.rebuild_range(start_date, end_date)
+```
+
+The dates use half-open `[start_date, end_date)` semantics. Raw `play_history`
+remains authoritative; missing snapshots remain gaps until such an explicit rebuild.
+Rebuilding cannot make locally stored playback complete, and Memory does not
+guarantee complete Spotify account history.
 
 ## Temporal consumption
 
@@ -46,6 +61,10 @@ rebuild, upsert, or other Memory lifecycle side effects.
 
 Memory stores Analytics snapshots; it does not calculate rankings, interpret
 preferences, compose Narrative, render output, or call Spotify or an LLM.
+
+Long-term observations describe only locally recorded evidence. Daily artist
+duration uses the existing primary-artist attribution rule preserved in each
+`DailyListeningProfile`.
 
 It currently contains no favorite, streak, rediscovery, session, or preference
 classification. It represents listening recorded by MusicMind and is not a

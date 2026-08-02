@@ -66,6 +66,7 @@ def _continuity_fact(
             "subject_key": _subject_key(
                 evidence.spotify_artist_id, evidence.artist_name
             ),
+            "concept_key": "artist_continuity",
             "spotify_artist_id": evidence.spotify_artist_id,
             "artist_name": evidence.artist_name,
             "recorded_day_count": evidence.recorded_day_count,
@@ -117,6 +118,7 @@ def _emergence_fact(
             "subject_key": _subject_key(
                 evidence.spotify_artist_id, evidence.artist_name
             ),
+            "concept_key": "artist_emergence",
             "spotify_artist_id": evidence.spotify_artist_id,
             "artist_name": evidence.artist_name,
             "recent_duration_share": evidence.recent_duration_share,

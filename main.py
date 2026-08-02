@@ -9,6 +9,7 @@ from music_ai.analytics.listening_analytics import ListeningAnalytics, Listening
 from music_ai.analytics.listening_profile import DailyListeningProfile
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
+from music_ai.knowledge.long_term_knowledge_engine import LongTermKnowledgeEngine
 from music_ai.knowledge.models import KnowledgeFact
 from music_ai.knowledge.recent_knowledge_engine import RecentKnowledgeEngine
 from music_ai.memory.engine import MemoryEngine
@@ -30,10 +31,12 @@ from music_ai.presentation.narrative_markdown_renderer import render_daily_narra
 from music_ai.spotify.auth import SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 from music_ai.temporal.analytics import TemporalListeningAnalytics
+from music_ai.temporal.long_term_analytics import LongTermListeningAnalytics
 
 
 _RECENT_WINDOW_DAYS = 7
 _COMPARISON_WINDOW_DAYS = 7
+_LONG_TERM_WINDOW_DAYS = 30
 
 
 def main() -> None:
@@ -73,7 +76,7 @@ def main() -> None:
     memory_engine = _capture_current_memory(
         database, timezone_name, analytics_time
     )
-    recent_facts = _recent_listening_facts(
+    recent_facts, long_term_facts = _longitudinal_listening_facts(
         memory_engine,
         timezone_name,
         analytics_time,
@@ -87,6 +90,7 @@ def main() -> None:
         current_profile,
         facts,
         recent_facts=recent_facts,
+        long_term_facts=long_term_facts,
     )
 
 
@@ -147,15 +151,63 @@ def _daily_listening_summaries(
 def _capture_current_memory(
     database: Database, timezone_name: str, generated_at: datetime
 ) -> MemoryEngine:
-    """Persist only the current local-calendar profile after synchronization."""
+    """Finalize yesterday, then refresh today after synchronization."""
     engine = MemoryEngine(
         ListeningAnalytics(database),
         ListeningMemoryRepository(database),
         timezone_name,
         clock=lambda: generated_at,
     )
+    local_date = generated_at.astimezone(ZoneInfo(timezone_name)).date()
+    engine.capture_date(local_date - timedelta(days=1))
     engine.capture_current_day()
     return engine
+
+
+def _longitudinal_listening_facts(
+    memory_engine: MemoryEngine,
+    timezone_name: str,
+    as_of: datetime,
+) -> tuple[list[KnowledgeFact], tuple[KnowledgeFact, ...]]:
+    """Build recent and long-term facts from one application-bounded Memory read."""
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("Longitudinal analysis time must be timezone-aware.")
+    local_date = as_of.astimezone(ZoneInfo(timezone_name)).date()
+
+    recent_end_date = local_date + timedelta(days=1)
+    recent_start_date = recent_end_date - timedelta(days=_RECENT_WINDOW_DAYS)
+    comparison_end_date = recent_start_date
+    comparison_start_date = comparison_end_date - timedelta(
+        days=_COMPARISON_WINDOW_DAYS
+    )
+    long_term_end_date = local_date
+    long_term_start_date = long_term_end_date - timedelta(
+        days=_LONG_TERM_WINDOW_DAYS
+    )
+    memory = memory_engine.load_range(
+        min(long_term_start_date, comparison_start_date), recent_end_date
+    )
+
+    recent_evidence = TemporalListeningAnalytics().analyze(
+        memory,
+        recent_start_date=recent_start_date,
+        recent_end_date=recent_end_date,
+        comparison_start_date=comparison_start_date,
+        comparison_end_date=comparison_end_date,
+        timezone_name=timezone_name,
+        as_of=as_of,
+    )
+    long_term_evidence = LongTermListeningAnalytics().analyze(
+        memory,
+        start_date=long_term_start_date,
+        end_date=long_term_end_date,
+        timezone_name=timezone_name,
+        as_of=as_of,
+    )
+    return (
+        RecentKnowledgeEngine(recent_evidence).generate_facts(),
+        LongTermKnowledgeEngine(long_term_evidence).generate_facts(),
+    )
 
 
 def _recent_listening_facts(
@@ -197,10 +249,11 @@ def _print_daily_outputs(
     report_generator_factory: Callable[[], ReportGenerator] = ReportGenerator,
     *,
     recent_facts: Sequence[KnowledgeFact] = (),
+    long_term_facts: Sequence[KnowledgeFact] = (),
 ) -> None:
     """Print deterministic Narrative output before generating the existing AI report."""
     narrative = NarrativeEngine(
-        listening_profile, (*facts, *recent_facts)
+        listening_profile, (*facts, *recent_facts, *long_term_facts)
     ).compose()
     _print_daily_narrative(render_daily_narrative(narrative))
     report_generator = report_generator_factory()

@@ -1,21 +1,22 @@
 # MusicMind AI
 
-MusicMind imports Spotify listening data and builds deterministic daily and recent
-listening intelligence. Analytics produces statistics, Listening Memory preserves
-versioned daily evidence, Temporal Analytics compares caller-selected periods,
-Knowledge interprets evidence, and Narrative composes the deterministic product
-output. A configurable LLM report remains a separate enhancement path.
+MusicMind imports Spotify listening data and builds deterministic daily, recent,
+and long-term listening intelligence. Analytics produces statistics, Listening
+Memory preserves versioned daily evidence, Temporal Analytics evaluates explicit
+bounded periods, Knowledge interprets evidence, and Narrative composes the
+deterministic product output. A configurable LLM report remains separate.
 
 ## What It Does
 
 After authenticating your Spotify account, the app downloads recently played tracks,
-refreshes the current local-day Memory snapshot, and prints:
+finalizes the previous local-day Memory snapshot, refreshes the current snapshot,
+and prints:
 
 - Spotify Login Success
 - Imported playback-record count
 - Database update confirmation
 - A deterministic `MusicMind Daily` with the current profile and supported recent
-  observations
+  and `Over Time` observations
 - A separate AI-generated Daily Brief
 
 ## Requirements
@@ -87,10 +88,13 @@ music_ai/
     temporal/
         models.py
         analytics.py
+        long_term_models.py
+        long_term_analytics.py
     knowledge/
         models.py
         knowledge_engine.py
         recent_knowledge_engine.py
+        long_term_knowledge_engine.py
     narrative/
         models.py
         engine.py
@@ -130,21 +134,24 @@ README.md
 ## Scope
 
 Raw playback history remains authoritative. Analytics calculates deterministic
-daily profiles, while Listening Memory stores rebuildable daily snapshots. Temporal
-Analytics reads explicit bounded Memory ranges and produces immutable evidence for
-artist continuity and artist emergence. It owns no default period, persistence
-lifecycle, prose, or product-meaning thresholds.
+daily profiles, while Listening Memory stores rebuildable daily snapshots. Recent
+and long-term Temporal Analytics use separate immutable evidence contracts. The
+long-term contract describes artist consistency, listening concentration, and
+artist breadth. Neither analytics path owns default periods, persistence, prose, or
+product-meaning thresholds.
 
 Knowledge interprets analytics and temporal evidence into reusable dataclass facts.
-Narrative then selects and organizes those facts for deterministic Presentation.
-The AI layer turns the existing non-recent fact collection into a separate report
-through a configured provider; it does not access Spotify, databases, repositories,
-Analytics, Memory, or Temporal Analytics.
+Narrative selects recent and long-term observations into separate bounded threads.
+The application owns the 30-calendar-day long-term runtime window and excludes the
+current open local day. Recent and long-term facts remain outside the separate AI
+report path.
 
 See `docs/architecture.md`, `docs/memory.md`, `docs/temporal.md`,
 `docs/knowledge.md`, and `docs/narrative.md` for layer boundaries and extension
 guidance.
 
-This sprint intentionally does not include a recommendation engine, an AI DJ,
-dashboards, streaming, conversation memory, long-term preference classification, or
-scheduling.
+Long-term observations describe locally recorded evidence using the existing
+primary-artist attribution rule. They do not guarantee complete Spotify account
+history or define identity, personality, permanent taste, motivation, or emotion.
+This sprint intentionally excludes recommendations, dashboards, comparison
+profiles, persistent display history, automatic backfill, and scheduling.

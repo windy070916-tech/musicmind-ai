@@ -43,7 +43,7 @@ def test_musicmind_timezone_configuration_is_explicit_and_validated(
     assert config.load_musicmind_timezone() == "Asia/Shanghai"
 
 
-def test_capture_current_memory_delegates_once_without_historical_rebuild(
+def test_capture_current_memory_finalizes_previous_day_before_current_without_rebuild(
     monkeypatch,
 ) -> None:
     calls = []
@@ -59,6 +59,9 @@ def test_capture_current_memory_delegates_once_without_historical_rebuild(
         def capture_current_day(self):
             calls.append("capture_current")
 
+        def capture_date(self, local_date):
+            calls.append(("capture_date", local_date))
+
         def rebuild_range(self, *_args):
             raise AssertionError("Runtime must not rebuild history.")
 
@@ -73,6 +76,7 @@ def test_capture_current_memory_delegates_once_without_historical_rebuild(
 
     assert calls == [
         ("init", analytics, repository, "Asia/Shanghai", generated_at),
+        ("capture_date", date(2026, 7, 23)),
         "capture_current",
     ]
 
@@ -162,21 +166,22 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
         capture_memory,
     )
 
-    def recent_facts(_engine, timezone_name, _now):
+    def longitudinal_facts(_engine, timezone_name, _now):
         events.append("recent_analysis")
         captured.append(timezone_name)
-        return []
+        return [], ()
 
     monkeypatch.setattr(
         main,
-        "_recent_listening_facts",
-        recent_facts,
+        "_longitudinal_listening_facts",
+        longitudinal_facts,
     )
 
-    def output(received_profile, facts, *, recent_facts):
+    def output(received_profile, facts, *, recent_facts, long_term_facts):
         events.append("product_output")
         assert received_profile is profile
         assert recent_facts == []
+        assert long_term_facts == ()
         captured.append(tuple(facts))
 
     monkeypatch.setattr(main, "_print_daily_outputs", output)

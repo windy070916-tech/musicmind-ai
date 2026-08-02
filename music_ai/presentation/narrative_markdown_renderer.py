@@ -99,6 +99,17 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
             )
         )
 
+    if narrative.long_term_thread is not None:
+        sections.extend(
+            (
+                "## Over Time",
+                "\n".join(
+                    f"- {fact.description}"
+                    for fact in narrative.long_term_thread.observations
+                ),
+            )
+        )
+
     highlights = tuple(_eligible_highlights(narrative.highlights))[:3]
     if highlights:
         sections.extend(

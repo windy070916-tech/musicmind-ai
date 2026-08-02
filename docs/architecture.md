@@ -23,7 +23,9 @@ Analytics
     |             |
     |             v
     |      Temporal Analytics
-    |             |
+    |       /             \
+    |  Recent Evidence  Long-term Evidence
+    |       \             /
     v             v
 Knowledge <-------+
     | \
@@ -50,16 +52,19 @@ knowledge interpretation, or presentation.
 
 ## Repository
 
-Repositories persist and retrieve domain models from SQLite. They own database
-reads and writes, map rows to domain objects, and keep SQL details away from
-analytics and presentation code.
+Most persistence operations use repositories, which persist and retrieve domain
+models from SQLite and map rows to domain objects. `ListeningAnalytics` is the
+current exception: it reads SQLite through the `Database` abstraction directly for
+bounded analytical queries.
 
 ## Analytics
 
-Analytics reads repository-backed data and calculates listening statistics, such as
-total listening time, playback count, top songs, and top artists. It produces
-`ListeningSummary` objects and does not interpret those values as user-facing
-insights.
+Analytics calculates bounded listening statistics such as total listening time,
+playback count, top songs, and top artists. `ListeningAnalytics` currently executes
+its analytical SQL through `Database`; downstream Memory consumers, Temporal,
+Knowledge, Narrative, Presentation, and AI do not reach backward into raw storage.
+Analytics produces `ListeningSummary` and `DailyListeningProfile` values without
+interpreting them as user-facing insights.
 
 ## Memory
 
@@ -68,10 +73,11 @@ explicit local-calendar dates. Raw `play_history` remains authoritative, and eve
 Memory snapshot is safe to delete and rebuild. Snapshot identity includes the
 configured IANA timezone and an explicit contract version.
 
-Runtime refreshes only the current date after synchronization. Bounded reads are
-side-effect free and preserve missing dates as gaps; historical generation occurs
-only through an explicit rebuild. Memory does not calculate Analytics, interpret
-behavior, produce prose, or call Spotify or an LLM.
+Runtime finalizes the previous local date before refreshing the current date after
+synchronization. Bounded reads are side-effect free and preserve missing dates as
+gaps; other historical generation occurs only through an explicit bounded rebuild.
+Memory does not calculate Analytics, interpret behavior, produce prose, or call
+Spotify or an LLM.
 
 ## Temporal Analytics
 
@@ -80,32 +86,36 @@ bounded `ListeningMemory`. The caller supplies non-overlapping, half-open recent
 comparison windows. Temporal Analytics has no built-in seven-day, weekly, or monthly
 period and does not capture, load, rebuild, or persist Memory.
 
-Its current public output is `RecentListeningEvidence`, containing artist continuity
-and artist emergence evidence plus coverage gaps and open-day state. These are
-calculations, not user-facing conclusions. See `temporal.md` for exact definitions.
+Recent analysis produces `RecentListeningEvidence` for artist continuity and artist
+emergence. The independent long-term implementation produces
+`LongTermListeningEvidence` for artist consistency, listening concentration, and
+artist breadth. Both preserve coverage gaps and open-day state. These are
+calculations, not user-facing conclusions. The application—not either analytics
+class—owns the runtime periods, including the explicit 30-day long-term policy.
 
 ## Knowledge
 
 Knowledge converts analytics results into reusable `KnowledgeFact` objects. It does
 not query Spotify, access the database, or calculate analytics. It interprets
 already-computed summaries into daily, trend, and insight facts. Separately,
-`RecentKnowledgeEngine` interprets completed Temporal Evidence into recent facts;
-it never reads Memory or re-aggregates profiles.
+`RecentKnowledgeEngine` and `LongTermKnowledgeEngine` interpret their completed,
+separate Temporal Evidence contracts; neither reads Memory or re-aggregates profiles.
 
 ## Narrative
 
 Narrative combines a `DailyListeningProfile` with already-interpreted
 `KnowledgeFact` objects into the stable `DailyNarrative` product contract. It owns
-composition, deterministic ordering, recent-observation selection, and same-subject
-deduplication—not analytics, interpretation, rendering, or AI generation.
+composition, deterministic ordering, bounded recent and long-term observation
+selection, and subject-plus-concept deduplication—not analytics, interpretation,
+rendering, or AI generation.
 
 ## Presentation
 
 Presentation renders `DailyNarrative` as the deterministic `MusicMind Daily`. It
 formats existing values and descriptions without accessing Spotify, SQLite,
 repositories, Analytics, Temporal Analytics, Knowledge engines, or LLM providers.
-The optional `Recently` section simply renders the observations already selected by
-Narrative.
+The optional `Recently` and `Over Time` sections simply render observations already
+selected by Narrative.
 
 ## Report Generator
 
@@ -115,8 +125,8 @@ depends on facts, not on Spotify, repositories, databases, or analytics. The sam
 brief object can later be rendered by a web or mobile presentation adapter.
 
 The AI report remains separate from the deterministic Narrative presentation path.
-The current runtime does not add recent temporal facts to the AI prompt, so Sprint
-3B does not change provider behavior or prompt behavior.
+The runtime does not add recent or long-term facts to the AI prompt, preserving the
+existing provider and prompt behavior.
 
 ## LLM Provider
 

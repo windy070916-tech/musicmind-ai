@@ -27,7 +27,7 @@ will be displayed.
 
 - `DAILY`: one daily profile or summary.
 - `RECENT`: bounded longitudinal evidence across recent periods.
-- `LONG_TERM`: reserved for future evidence with a longer horizon.
+- `LONG_TERM`: bounded longitudinal evidence representing a longer listening horizon.
 
 `InsightType` remains the semantic grouping (`DAILY_LISTENING`, `TREND`, or
 `BEHAVIOR`) and must not be overloaded to encode the period. Existing facts default
@@ -99,6 +99,28 @@ has not occurred, continuity accounts for less than half of recent listening day
 or emergence does not reach both a 25% recent share and a 15 percentage-point
 increase. These are deterministic product thresholds, not calculations delegated
 to Narrative or Presentation.
+
+## Long-term Facts
+
+`LongTermKnowledgeEngine` consumes only completed `LongTermListeningEvidence`. It
+never reads Memory, selects the application window, or aggregates daily snapshots.
+It can create at most one fact for each long-term concept:
+
+- `ARTIST_CONSISTENCY`: an artist newly reaches eight appearance days, at least half
+  of the period's recorded listening days, and six closed supporting days;
+- `LISTENING_CONCENTRATION`: the deterministic top-five artist share newly reaches
+  70% of recorded listening time; and
+- `ARTIST_BREADTH`: the period newly reaches 20 artists, two artist appearances per
+  listening day, and eight single-day artists.
+
+All use `FactTimeHorizon.LONG_TERM`, `InsightType.BEHAVIOR`, and
+`FactSource.LONG_TERM_LISTENING_EVIDENCE`. Metadata preserves exact coverage, gaps,
+closed support, a stable `subject_key`, and a stable `concept_key`. Current and
+prefix evidence make novelty deterministic without storing display history.
+
+Descriptions state locally recorded behavior. They do not classify identity,
+personality, permanent taste, motivation, emotion, favorites, or loyalty. Recent and
+long-term facts remain outside the AI Daily Brief path in this release.
 
 ## Adding Future Insights
 

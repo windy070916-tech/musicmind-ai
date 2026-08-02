@@ -23,6 +23,9 @@ class FactCategory(StrEnum):
     STABLE_FAVORITE = "stable_favorite"
     ARTIST_CONTINUITY = "artist_continuity"
     ARTIST_EMERGENCE = "artist_emergence"
+    ARTIST_CONSISTENCY = "artist_consistency"
+    LISTENING_CONCENTRATION = "listening_concentration"
+    ARTIST_BREADTH = "artist_breadth"
 
 
 class InsightType(StrEnum):
@@ -47,6 +50,7 @@ class FactSource(StrEnum):
     LISTENING_SUMMARY = "listening_summary"
     LISTENING_SUMMARY_COMPARISON = "listening_summary_comparison"
     RECENT_LISTENING_EVIDENCE = "recent_listening_evidence"
+    LONG_TERM_LISTENING_EVIDENCE = "long_term_listening_evidence"
 
 
 class FactTimeHorizon(StrEnum):

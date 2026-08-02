@@ -33,6 +33,29 @@ class RecentListeningThread:
 
 
 @dataclass(frozen=True, slots=True)
+class LongTermListeningThread:
+    """A small, presentation-independent set of long-term observations."""
+
+    observations: tuple[KnowledgeFact, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "observations", tuple(self.observations))
+        if len(self.observations) > 2:
+            raise ValueError(
+                "LongTermListeningThread cannot contain more than two observations."
+            )
+        for fact in self.observations:
+            if not isinstance(fact, KnowledgeFact):
+                raise ValueError(
+                    "LongTermListeningThread observations must be KnowledgeFact values."
+                )
+            if fact.time_horizon != FactTimeHorizon.LONG_TERM:
+                raise ValueError(
+                    "LongTermListeningThread observations must use the long-term horizon."
+                )
+
+
+@dataclass(frozen=True, slots=True)
 class DailyNarrative:
     """A presentation-independent composition of one day's listening experience.
 
@@ -46,6 +69,7 @@ class DailyNarrative:
     highlights: tuple[KnowledgeFact, ...] = ()
     metadata: Mapping[str, object] = field(default_factory=dict)
     recent_thread: RecentListeningThread | None = None
+    long_term_thread: LongTermListeningThread | None = None
 
     def __post_init__(self) -> None:
         """Take immutable snapshots of the collection-valued fields."""
@@ -62,3 +86,14 @@ class DailyNarrative:
             and not self.recent_thread.observations
         ):
             object.__setattr__(self, "recent_thread", None)
+        if self.long_term_thread is not None and not isinstance(
+            self.long_term_thread, LongTermListeningThread
+        ):
+            raise ValueError(
+                "long_term_thread must be a LongTermListeningThread or None."
+            )
+        if (
+            self.long_term_thread is not None
+            and not self.long_term_thread.observations
+        ):
+            object.__setattr__(self, "long_term_thread", None)

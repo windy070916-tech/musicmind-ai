@@ -15,15 +15,15 @@ apply output formatting.
 - `KnowledgeFact` collections supply already-interpreted facts and insights.
 
 Narrative treats both inputs as read-only. `NarrativeEngine` snapshots fact
-collections and separates recent facts from ordinary highlights.
+collections and separates recent and long-term facts from ordinary highlights.
 
 ## Output
 
 `DailyNarrative` is the immutable, renderer-facing contract containing a headline,
 an optional `listening_profile`, ordered knowledge highlights, an optional
-`recent_thread`, and immutable extension metadata. The explicit profile name
-distinguishes the complete analytics result from the smaller existing
-`ListeningSummary` contract.
+`recent_thread`, an optional `long_term_thread`, and immutable extension metadata.
+The explicit profile name distinguishes the complete analytics result from the
+smaller existing `ListeningSummary` contract.
 
 `RecentListeningThread` is a presentation-independent collection containing at most
 two `FactTimeHorizon.RECENT` observations. `NarrativeEngine` selects it
@@ -41,15 +41,23 @@ shares, inspect Memory, apply evidence thresholds, or keep presentation history.
 Its novelty behavior comes from the transition evidence already interpreted by
 Knowledge.
 
-Non-recent facts remain in `highlights` and retain their deterministic importance
-ordering. Recent facts are excluded from generic highlights so the same observation
-is not rendered twice.
+Ordinary facts remain in `highlights` and retain their deterministic importance
+ordering. Recent and long-term facts are excluded for their dedicated threads.
+
+`LongTermListeningThread` contains at most two `FactTimeHorizon.LONG_TERM`
+observations. Narrative orders artist consistency, artist breadth, then listening
+concentration before applying stable tie-breakers. After selecting the recent
+thread, it deduplicates long-term observations only when both non-empty
+`subject_key` and `concept_key` values match. The same subject may appear in both
+threads when the concepts differ. No qualifying long-term fact produces
+`long_term_thread=None`.
 
 MusicMind now renders this contract as the deterministic `MusicMind Daily` before
 calling the separate AI report path. The renderer formats only the existing profile
 and selected fact descriptions. When a thread exists, Presentation prints a
-`Recently` section in the order supplied by Narrative; it does not filter, rank, or
-deduplicate those observations.
+`Recently` section in the order supplied by Narrative. The optional `Over Time`
+section follows it and also preserves Narrative order. Presentation does not filter,
+rank, or deduplicate either collection.
 
 The AI Daily Brief remains an independent optional interpretation path. Its legacy
 Knowledge facts are based on `ListeningSummary`, while profile artist rankings use
