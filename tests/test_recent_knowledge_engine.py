@@ -13,6 +13,7 @@ from music_ai.knowledge import (
     ImportanceLevel,
     InsightType,
     KnowledgeFact,
+    FactMessageKey,
     RecentKnowledgeEngine,
 )
 from music_ai.temporal import (
@@ -123,6 +124,7 @@ def test_continuity_evidence_is_interpreted_as_a_recent_knowledge_fact() -> None
     assert fact.date_range == ("2026-07-04", "2026-07-08")
     assert fact.metadata["subject_key"] == "spotify:artist-a"
     assert fact.metadata["gap_dates"] == ("2026-07-06",)
+    assert fact.message_key is FactMessageKey.RECENT_ARTIST_CONTINUITY
     assert fact.metadata["contains_open_day"] is True
 
 
@@ -147,6 +149,7 @@ def test_emergence_evidence_is_interpreted_as_a_recent_knowledge_fact() -> None:
     assert fact.metadata["comparison_duration_share"] == pytest.approx(0.1)
     assert fact.metadata["duration_share_change"] == pytest.approx(0.3)
     assert fact.metadata["recent_gap_dates"] == ("2026-07-06",)
+    assert fact.message_key is FactMessageKey.RECENT_ARTIST_EMERGENCE
 
 
 def test_legacy_artist_fact_uses_normalized_name_as_subject_identity() -> None:

@@ -51,7 +51,8 @@ def test_daily_outputs_print_narrative_before_constructing_and_calling_ai(monkey
             events.append(("generate_ai", received_facts))
             return "AI report"
 
-    def factory():
+    def factory(locale):
+        assert locale.value == "en-US"
         events.append("construct_ai")
         return FakeReportGenerator()
 
@@ -63,7 +64,7 @@ def test_daily_outputs_print_narrative_before_constructing_and_calling_ai(monkey
     monkeypatch.setattr(
         main,
         "_print_ai_report",
-        lambda report: events.append(("ai", report)),
+        lambda report, *, locale: events.append(("ai", report)),
     )
     monkeypatch.setattr(
         main, "_print_daily_facts", lambda _facts: events.append("raw_daily")
@@ -115,13 +116,15 @@ def test_recent_facts_render_but_do_not_change_existing_ai_input(
         lambda report: events.append(("daily", report)),
     )
     monkeypatch.setattr(
-        main, "_print_ai_report", lambda report: events.append(("ai", report))
+        main,
+        "_print_ai_report",
+        lambda report, *, locale: events.append(("ai", report)),
     )
 
     main._print_daily_outputs(
         _profile(),
         daily_facts,
-        lambda: FakeReportGenerator(),
+        lambda _locale: FakeReportGenerator(),
         recent_facts=(recent_fact,),
     )
 
@@ -160,13 +163,15 @@ def test_long_term_facts_render_but_do_not_change_existing_ai_input(
         lambda report: events.append(("daily", report)),
     )
     monkeypatch.setattr(
-        main, "_print_ai_report", lambda report: events.append(("ai", report))
+        main,
+        "_print_ai_report",
+        lambda report, *, locale: events.append(("ai", report)),
     )
 
     main._print_daily_outputs(
         _profile(),
         daily_facts,
-        lambda: FakeReportGenerator(),
+        lambda _locale: FakeReportGenerator(),
         long_term_facts=(long_term_fact,),
     )
 

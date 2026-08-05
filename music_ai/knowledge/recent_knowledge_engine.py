@@ -8,6 +8,7 @@ from music_ai.knowledge.models import (
     InsightType,
     KnowledgeFact,
 )
+from music_ai.knowledge.message_keys import FactMessageKey
 from music_ai.temporal.models import (
     ArtistContinuityEvidence,
     ArtistEmergenceEvidence,
@@ -87,6 +88,7 @@ def _continuity_fact(
         ),
         insight_type=InsightType.BEHAVIOR,
         time_horizon=FactTimeHorizon.RECENT,
+        message_key=FactMessageKey.RECENT_ARTIST_CONTINUITY,
     )
 
 
@@ -154,6 +156,7 @@ def _emergence_fact(
         ),
         insight_type=InsightType.BEHAVIOR,
         time_horizon=FactTimeHorizon.RECENT,
+        message_key=FactMessageKey.RECENT_ARTIST_EMERGENCE,
     )
 
 

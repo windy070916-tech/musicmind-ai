@@ -117,6 +117,24 @@ repositories, Analytics, Temporal Analytics, Knowledge engines, or LLM providers
 The optional `Recently` and `Over Time` sections simply render observations already
 selected by Narrative.
 
+## Localization
+
+The application loads `.env`, resolves one `SupportedLocale`, and validates all
+static catalogs before Spotify authentication or database initialization. Resolution
+is CLI `--locale`, then `MUSICMIND_LOCALE`, then the fixed bilingual terminal
+selector, then the non-interactive `zh-CN` default.
+
+Localization depends on Knowledge contracts, never the reverse. Built-in facts keep
+their canonical English `title` and `description` and add a semantic
+`FactMessageKey`. Narrative selects and orders those canonical facts without locale.
+Only the deterministic renderer localizes the already-composed observations, using
+the message key, immutable metadata, Chinese templates, and focused formatters.
+
+Locale may enter runtime copy, deterministic Presentation, ReportGenerator prompt
+composition, and AI Markdown headings. It must not enter SQLite, repositories,
+Analytics, Memory, Temporal Evidence, Knowledge calculations, Narrative contracts,
+`DailyBrief`, or provider adapters. See `docs/localization.md`.
+
 ## Report Generator
 
 The report generator converts structured knowledge facts into a provider-neutral
@@ -127,6 +145,11 @@ brief object can later be rendered by a web or mobile presentation adapter.
 The AI report remains separate from the deterministic Narrative presentation path.
 The runtime does not add recent or long-term facts to the AI prompt, preserving the
 existing provider and prompt behavior.
+
+Sprint 3D passes the resolved locale to ReportGenerator only to append an explicit
+output-language instruction. Its fact input remains canonical English and retains
+the existing daily, trend, and insight scope. `DailyBrief`, its English protocol
+field names, schema validation, and provider adapters remain language-neutral.
 
 ## LLM Provider
 

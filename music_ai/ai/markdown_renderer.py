@@ -1,33 +1,39 @@
 """Markdown rendering for MusicMind's structured Daily Brief."""
 
 from music_ai.ai.daily_brief import DailyBrief
+from music_ai.localization.catalog import ui_text
+from music_ai.localization.models import SupportedLocale, UiMessageKey
 
 
-def render_daily_brief(brief: DailyBrief) -> str:
+def render_daily_brief(
+    brief: DailyBrief,
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> str:
     """Render a Daily Brief in the stable Markdown format used by MusicMind."""
     summary = "\n".join(f"- {item}" for item in brief.listening_summary)
-    return f"""# MusicMind Daily Brief
+    return f"""# {ui_text(locale, UiMessageKey.AI_REPORT_TITLE)}
 
-## 👋 Greeting
+## 👋 {ui_text(locale, UiMessageKey.AI_GREETING)}
 
 {brief.greeting}
 
-## 🎵 Listening Summary
+## 🎵 {ui_text(locale, UiMessageKey.AI_LISTENING_SUMMARY)}
 
 {summary}
 
-## 📈 Trend
+## 📈 {ui_text(locale, UiMessageKey.AI_TREND)}
 
 {brief.trend}
 
-## 🧠 Insight
+## 🧠 {ui_text(locale, UiMessageKey.AI_INSIGHT)}
 
 {brief.insight}
 
-## 💡 Recommendation
+## 💡 {ui_text(locale, UiMessageKey.AI_RECOMMENDATION)}
 
 {brief.recommendation}
 
-## ✨ Closing
+## ✨ {ui_text(locale, UiMessageKey.AI_CLOSING)}
 
 {brief.closing}"""

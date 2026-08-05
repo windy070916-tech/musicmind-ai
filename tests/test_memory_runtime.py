@@ -30,7 +30,6 @@ def _profile() -> DailyListeningProfile:
 def test_musicmind_timezone_configuration_is_explicit_and_validated(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(config, "load_dotenv", lambda: None)
     monkeypatch.delenv("MUSICMIND_TIMEZONE", raising=False)
     with pytest.raises(RuntimeError, match="MUSICMIND_TIMEZONE"):
         config.load_musicmind_timezone()
@@ -41,6 +40,15 @@ def test_musicmind_timezone_configuration_is_explicit_and_validated(
 
     monkeypatch.setenv("MUSICMIND_TIMEZONE", "Asia/Shanghai")
     assert config.load_musicmind_timezone() == "Asia/Shanghai"
+
+
+def test_application_environment_loading_is_an_explicit_bootstrap_step(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(config, "load_dotenv", lambda: calls.append("dotenv"))
+    config.load_environment()
+    assert calls == ["dotenv"]
 
 
 def test_capture_current_memory_finalizes_previous_day_before_current_without_rebuild(
@@ -89,8 +97,9 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
     profile = _profile()
 
     class FakeAuth:
-        def __init__(self, _settings):
+        def __init__(self, _settings, *, messages):
             events.append("auth_init")
+            assert messages.open_url.startswith("请在浏览器中")
 
         def authenticate(self):
             events.append("authenticate")
@@ -131,7 +140,11 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
     monkeypatch.setattr(
         main, "PlayHistoryRepository", FakePlayHistoryRepository
     )
-    monkeypatch.setattr(main, "_download_recent_tracks", lambda *_args: [{}])
+    monkeypatch.setattr(
+        main,
+        "_download_recent_tracks",
+        lambda *_args, **_kwargs: [{}],
+    )
     monkeypatch.setattr(
         main, "_parse_recent_tracks", lambda _items: ([], [object()])
     )
@@ -177,11 +190,12 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
         longitudinal_facts,
     )
 
-    def output(received_profile, facts, *, recent_facts, long_term_facts):
+    def output(received_profile, facts, *, recent_facts, long_term_facts, locale):
         events.append("product_output")
         assert received_profile is profile
         assert recent_facts == []
         assert long_term_facts == ()
+        assert locale.value == "zh-CN"
         captured.append(tuple(facts))
 
     monkeypatch.setattr(main, "_print_daily_outputs", output)
@@ -212,7 +226,7 @@ def test_invalid_timezone_fails_before_spotify_authentication(monkeypatch) -> No
     )
 
     class UnexpectedAuth:
-        def __init__(self, _settings):
+        def __init__(self, _settings, **_kwargs):
             raise AssertionError("Spotify auth must not start.")
 
     monkeypatch.setattr(main, "SpotifyAuth", UnexpectedAuth)

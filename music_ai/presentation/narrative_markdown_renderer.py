@@ -2,7 +2,22 @@
 
 from collections.abc import Iterable
 
+from music_ai.analytics.listening_profile import (
+    RankedArtist,
+    RankedGenre,
+    RankedTrack,
+)
 from music_ai.knowledge.models import FactCategory, InsightType, KnowledgeFact
+from music_ai.localization.catalog import ui_text
+from music_ai.localization.fact_localizer import localize_fact
+from music_ai.localization.formatters import (
+    format_compact_duration,
+    format_percentage,
+    format_playback_count,
+    format_track_count,
+    join_display_names,
+)
+from music_ai.localization.models import SupportedLocale, UiMessageKey
 from music_ai.narrative.models import DailyNarrative
 
 
@@ -14,30 +29,59 @@ _BASIC_DAILY_CATEGORIES = {
 }
 
 
-def render_daily_narrative(narrative: DailyNarrative) -> str:
+def render_daily_narrative(
+    narrative: DailyNarrative,
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> str:
     """Render one immutable Narrative contract as deterministic Markdown."""
-    sections = ["# MusicMind Daily"]
+    sections = [f"# {ui_text(locale, UiMessageKey.DAILY_REPORT_TITLE)}"]
     subtitle = _subtitle(narrative.headline)
     if subtitle is not None:
         sections.append(subtitle)
 
     profile = narrative.listening_profile
     if profile is None:
-        sections.extend(("## Listening Overview", "Listening data is unavailable."))
+        sections.extend(
+            (
+                f"## {ui_text(locale, UiMessageKey.LISTENING_OVERVIEW)}",
+                ui_text(locale, UiMessageKey.LISTENING_UNAVAILABLE),
+            )
+        )
     elif profile.playback_count == 0:
         sections.extend(
-            ("## Listening Overview", "No listening activity was recorded today.")
+            (
+                f"## {ui_text(locale, UiMessageKey.LISTENING_OVERVIEW)}",
+                ui_text(locale, UiMessageKey.NO_LISTENING_ACTIVITY),
+            )
         )
     else:
         sections.extend(
             (
-                "## Listening Overview",
+                f"## {ui_text(locale, UiMessageKey.LISTENING_OVERVIEW)}",
                 "\n".join(
                     (
-                        "- Estimated listening duration: "
-                        f"{_format_duration(profile.total_estimated_listening_duration_ms)}",
-                        f"- Playback count: {_format_count(profile.playback_count, 'play')}",
-                        f"- Unique tracks: {_format_count(profile.unique_track_count, 'track')}",
+                        "- "
+                        + ui_text(
+                            locale,
+                            UiMessageKey.ESTIMATED_LISTENING_DURATION,
+                            duration=format_compact_duration(
+                                profile.total_estimated_listening_duration_ms,
+                                locale,
+                            ),
+                        ),
+                        "- "
+                        + ui_text(
+                            locale,
+                            UiMessageKey.PLAYBACK_COUNT,
+                            count=format_playback_count(profile.playback_count, locale),
+                        ),
+                        "- "
+                        + ui_text(
+                            locale,
+                            UiMessageKey.UNIQUE_TRACKS,
+                            count=format_track_count(profile.unique_track_count, locale),
+                        ),
                     )
                 ),
             )
@@ -47,12 +91,9 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
         if artists:
             sections.extend(
                 (
-                    "## Top Artists",
+                    f"## {ui_text(locale, UiMessageKey.TOP_ARTISTS)}",
                     "\n".join(
-                        f"{rank}. {artist.name} — estimated "
-                        f"{_format_duration(artist.estimated_listening_duration_ms)} · "
-                        f"{_format_count(artist.play_count, 'play')} · "
-                        f"{_format_percentage(artist.share)}"
+                        _ranked_artist_line(rank, artist, locale)
                         for rank, artist in enumerate(artists, start=1)
                     ),
                 )
@@ -62,13 +103,9 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
         if tracks:
             sections.extend(
                 (
-                    "## Top Tracks",
+                    f"## {ui_text(locale, UiMessageKey.TOP_TRACKS)}",
                     "\n".join(
-                        f"{rank}. {track.name} — "
-                        f"{', '.join(track.artist_names) or 'Unknown artist'} — estimated "
-                        f"{_format_duration(track.estimated_listening_duration_ms)} · "
-                        f"{_format_count(track.play_count, 'play')} · "
-                        f"{_format_percentage(track.share)}"
+                        _ranked_track_line(rank, track, locale)
                         for rank, track in enumerate(tracks, start=1)
                     ),
                 )
@@ -78,11 +115,9 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
         if genres:
             sections.extend(
                 (
-                    "## Genre Overview",
+                    f"## {ui_text(locale, UiMessageKey.GENRE_OVERVIEW)}",
                     "\n".join(
-                        f"{rank}. {genre.genre} — estimated "
-                        f"{_format_duration(genre.estimated_listening_duration_ms)} · "
-                        f"{_format_percentage(genre.share)}"
+                        _ranked_genre_line(rank, genre, locale)
                         for rank, genre in enumerate(genres, start=1)
                     ),
                 )
@@ -91,9 +126,9 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
     if narrative.recent_thread is not None:
         sections.extend(
             (
-                "## Recently",
+                f"## {ui_text(locale, UiMessageKey.RECENTLY)}",
                 "\n".join(
-                    f"- {fact.description}"
+                    f"- {localize_fact(fact, locale).description}"
                     for fact in narrative.recent_thread.observations
                 ),
             )
@@ -102,9 +137,9 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
     if narrative.long_term_thread is not None:
         sections.extend(
             (
-                "## Over Time",
+                f"## {ui_text(locale, UiMessageKey.OVER_TIME)}",
                 "\n".join(
-                    f"- {fact.description}"
+                    f"- {localize_fact(fact, locale).description}"
                     for fact in narrative.long_term_thread.observations
                 ),
             )
@@ -114,8 +149,11 @@ def render_daily_narrative(narrative: DailyNarrative) -> str:
     if highlights:
         sections.extend(
             (
-                "## Highlights",
-                "\n".join(f"- {fact.description}" for fact in highlights),
+                f"## {ui_text(locale, UiMessageKey.HIGHLIGHTS)}",
+                "\n".join(
+                    f"- {localize_fact(fact, locale).description}"
+                    for fact in highlights
+                ),
             )
         )
 
@@ -140,23 +178,61 @@ def _subtitle(headline: str) -> str | None:
     return normalized
 
 
-def _format_duration(duration_ms: int) -> str:
-    """Format estimated milliseconds as compact whole hours and minutes."""
-    total_minutes = duration_ms // 60_000
-    hours, minutes = divmod(total_minutes, 60)
-    if hours and minutes:
-        return f"{hours}h {minutes}m"
-    if hours:
-        return f"{hours}h"
-    return f"{minutes}m"
+def _display_artist_name(artist: RankedArtist, locale: SupportedLocale) -> str:
+    """Localize the Analytics-owned unknown-artist sentinel only."""
+    if artist.spotify_artist_id is None and artist.name == "Unknown artist":
+        return ui_text(locale, UiMessageKey.UNKNOWN_ARTIST)
+    return artist.name
 
 
-def _format_count(value: int, singular: str) -> str:
-    """Format a count with its singular or plural label."""
-    label = singular if value == 1 else f"{singular}s"
-    return f"{value} {label}"
+def _ranked_artist_line(
+    rank: int,
+    artist: RankedArtist,
+    locale: SupportedLocale,
+) -> str:
+    name = _display_artist_name(artist, locale)
+    duration = _ranked_duration(artist.estimated_listening_duration_ms, locale)
+    count = _ranked_playback(artist.play_count, locale)
+    percentage = format_percentage(artist.share, locale)
+    return f"{rank}. {name} — {duration} · {count} · {percentage}"
 
 
-def _format_percentage(share: float) -> str:
-    """Format a 0-1 share as a whole percentage."""
-    return f"{share:.0%}"
+def _ranked_track_line(
+    rank: int,
+    track: RankedTrack,
+    locale: SupportedLocale,
+) -> str:
+    names = join_display_names(track.artist_names, locale)
+    artist_names = names or ui_text(locale, UiMessageKey.UNKNOWN_ARTIST)
+    duration = _ranked_duration(track.estimated_listening_duration_ms, locale)
+    count = _ranked_playback(track.play_count, locale)
+    return (
+        f"{rank}. {track.name} — {artist_names} — {duration} · {count} · "
+        f"{format_percentage(track.share, locale)}"
+    )
+
+
+def _ranked_genre_line(
+    rank: int,
+    genre: RankedGenre,
+    locale: SupportedLocale,
+) -> str:
+    duration = _ranked_duration(genre.estimated_listening_duration_ms, locale)
+    percentage = format_percentage(genre.share, locale)
+    return f"{rank}. {genre.genre} — {duration} · {percentage}"
+
+
+def _ranked_duration(duration_ms: int, locale: SupportedLocale) -> str:
+    return ui_text(
+        locale,
+        UiMessageKey.RANKED_ESTIMATED_DURATION,
+        duration=format_compact_duration(duration_ms, locale),
+    )
+
+
+def _ranked_playback(count: int, locale: SupportedLocale) -> str:
+    return ui_text(
+        locale,
+        UiMessageKey.RANKED_PLAYBACK_COUNT,
+        count=format_playback_count(count, locale),
+    )

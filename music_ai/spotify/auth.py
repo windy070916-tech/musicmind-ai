@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from secrets import token_urlsafe
 from typing import Any
@@ -29,6 +30,18 @@ class SpotifyToken:
     scope: str | None = None
 
 
+@dataclass(frozen=True)
+class OAuthUserMessages:
+    """Prelocalized user copy injected without making OAuth locale-aware."""
+
+    open_url: str = "Open this URL in your browser to authenticate with Spotify:"
+    unknown_callback_path: str = "Unknown callback path."
+    authorization_failed: str = "Spotify authorization failed: {error}"
+    invalid_state: str = "Invalid authorization state."
+    missing_code: str = "Missing authorization code."
+    success: str = "Spotify authentication received. You can return to the terminal."
+
+
 class SpotifyAuth:
     """Handles Spotify OAuth authorization and token exchange."""
 
@@ -36,17 +49,23 @@ class SpotifyAuth:
         self,
         settings: SpotifySettings,
         scopes: tuple[str, ...] = DEFAULT_SCOPES,
+        messages: OAuthUserMessages = OAuthUserMessages(),
     ) -> None:
         self._settings = settings
         self._scopes = scopes
+        self._messages = messages
 
     def authenticate(self) -> SpotifyToken:
         """Run the browser-based OAuth flow and return a Spotify access token."""
         state = token_urlsafe(32)
-        callback_server = _CallbackServer(self._settings.redirect_uri, expected_state=state)
+        callback_server = _CallbackServer(
+            self._settings.redirect_uri,
+            expected_state=state,
+            messages=self._messages,
+        )
         authorization_url = self._build_authorization_url(state)
 
-        print("Open this URL in your browser to authenticate with Spotify:")
+        print(self._messages.open_url)
         print(authorization_url)
         webbrowser.open(authorization_url)
 
@@ -87,7 +106,12 @@ class SpotifyAuth:
 
 
 class _CallbackServer:
-    def __init__(self, redirect_uri: str, expected_state: str) -> None:
+    def __init__(
+        self,
+        redirect_uri: str,
+        expected_state: str,
+        messages: OAuthUserMessages = OAuthUserMessages(),
+    ) -> None:
         parsed_uri = urlparse(redirect_uri)
 
         if parsed_uri.scheme != "http":
@@ -101,11 +125,13 @@ class _CallbackServer:
         self._port = parsed_uri.port or 80
         self._path = parsed_uri.path or "/"
         self._expected_state = expected_state
+        self._messages = messages
 
     def wait_for_authorization_code(self) -> str:
         callback_result: dict[str, str] = {}
         expected_path = self._path
         expected_state = self._expected_state
+        messages = self._messages
 
         class SpotifyCallbackHandler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
@@ -113,38 +139,44 @@ class _CallbackServer:
                 query_params = parse_qs(parsed_request.query)
 
                 if parsed_request.path != expected_path:
-                    self._send_response(404, "Unknown callback path.")
+                    self._send_response(404, messages.unknown_callback_path)
                     return
 
                 error = _first_value(query_params, "error")
                 if error:
-                    callback_result["error"] = error
-                    self._send_response(400, f"Spotify authorization failed: {error}")
+                    localized_error = messages.authorization_failed.format(error=error)
+                    callback_result["error"] = localized_error
+                    self._send_response(
+                        400,
+                        localized_error,
+                    )
                     return
 
                 state = _first_value(query_params, "state")
                 if state != expected_state:
-                    callback_result["error"] = "Invalid authorization state."
-                    self._send_response(400, "Invalid authorization state.")
+                    callback_result["error"] = messages.invalid_state
+                    self._send_response(400, messages.invalid_state)
                     return
 
                 code = _first_value(query_params, "code")
                 if not code:
-                    callback_result["error"] = "Missing authorization code."
-                    self._send_response(400, "Missing authorization code.")
+                    callback_result["error"] = messages.missing_code
+                    self._send_response(400, messages.missing_code)
                     return
 
                 callback_result["code"] = code
                 self._send_response(
                     200,
-                    "Spotify authentication received. You can return to the terminal.",
+                    messages.success,
                 )
 
             def log_message(self, format: str, *args: Any) -> None:
                 return
 
             def _send_response(self, status_code: int, message: str) -> None:
-                body = f"<html><body><p>{message}</p></body></html>".encode("utf-8")
+                body = (
+                    f"<html><body><p>{html.escape(message)}</p></body></html>"
+                ).encode("utf-8")
                 self.send_response(status_code)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))

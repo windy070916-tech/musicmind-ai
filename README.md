@@ -19,6 +19,9 @@ and prints:
   and `Over Time` observations
 - A separate AI-generated Daily Brief
 
+Both reports use one runtime locale. MusicMind supports Simplified Chinese
+(`zh-CN`) and English (`en-US`), with `zh-CN` as the application default.
+
 ## Requirements
 
 - Python 3.11+
@@ -40,6 +43,7 @@ SPOTIPY_CLIENT_ID=your_client_id
 SPOTIPY_CLIENT_SECRET=your_client_secret
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
 MUSICMIND_TIMEZONE=Asia/Shanghai
+MUSICMIND_LOCALE=zh-CN
 LLM_PROVIDER=deepseek
 DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
@@ -48,6 +52,7 @@ Set `LLM_PROVIDER=openai` and provide `OPENAI_API_KEY` to use OpenAI instead.
 Optional `DEEPSEEK_MODEL` and `OPENAI_MODEL` variables override the adapter defaults.
 `MUSICMIND_TIMEZONE` is required and must be an IANA timezone name. It defines
 MusicMind's stable local-calendar day for Analytics and Listening Memory.
+`MUSICMIND_LOCALE` is optional; accepted values are exactly `zh-CN` and `en-US`.
 
 4. Install dependencies:
 
@@ -60,6 +65,26 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+
+Choose a locale explicitly with either CLI form:
+
+```bash
+python main.py --locale zh-CN
+python main.py --locale en-US
+```
+
+Or set one of these environment values:
+
+```env
+MUSICMIND_LOCALE=zh-CN
+MUSICMIND_LOCALE=en-US
+```
+
+Resolution is `--locale` > `MUSICMIND_LOCALE` > interactive terminal selection >
+non-interactive `zh-CN`. An interactive terminal offers Chinese or English once;
+empty input and end-of-input select Chinese. An invalid explicit CLI or environment
+value fails before Spotify authentication. The selected locale is resolved once,
+controls deterministic and AI output for that run, and is never persisted.
 
 The app opens Spotify authorization in your browser. After login, Spotify redirects
 back to the local callback server, then the app imports playback history into
@@ -91,6 +116,7 @@ music_ai/
         long_term_models.py
         long_term_analytics.py
     knowledge/
+        message_keys.py
         models.py
         knowledge_engine.py
         recent_knowledge_engine.py
@@ -100,6 +126,12 @@ music_ai/
         engine.py
     presentation/
         narrative_markdown_renderer.py
+    localization/
+        models.py
+        resolver.py
+        catalog.py
+        formatters.py
+        fact_localizer.py
     ai/
         base.py
         daily_brief.py
@@ -147,8 +179,8 @@ current open local day. Recent and long-term facts remain outside the separate A
 report path.
 
 See `docs/architecture.md`, `docs/memory.md`, `docs/temporal.md`,
-`docs/knowledge.md`, and `docs/narrative.md` for layer boundaries and extension
-guidance.
+`docs/knowledge.md`, `docs/narrative.md`, and `docs/localization.md` for layer
+boundaries and extension guidance.
 
 Long-term observations describe locally recorded evidence using the existing
 primary-artist attribution rule. They do not guarantee complete Spotify account

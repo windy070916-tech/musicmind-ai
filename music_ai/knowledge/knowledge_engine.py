@@ -1,6 +1,7 @@
 """Transform listening analytics into reusable knowledge facts."""
 
 from music_ai.analytics.listening_analytics import ListeningSummary
+from music_ai.knowledge.message_keys import FactMessageKey
 from music_ai.knowledge.models import (
     FactCategory,
     FactSource,
@@ -41,6 +42,7 @@ class KnowledgeEngine:
                 },
                 source=FactSource.LISTENING_SUMMARY,
                 insight_type=InsightType.DAILY_LISTENING,
+                message_key=FactMessageKey.DAILY_LISTENING_TIME,
             ),
             KnowledgeFact(
                 category=FactCategory.PLAYBACK_COUNT,
@@ -50,6 +52,7 @@ class KnowledgeEngine:
                 metadata={"playback_count": self._current_summary.playback_count},
                 source=FactSource.LISTENING_SUMMARY,
                 insight_type=InsightType.DAILY_LISTENING,
+                message_key=FactMessageKey.DAILY_PLAYBACK_COUNT,
             ),
         ]
 
@@ -67,6 +70,7 @@ class KnowledgeEngine:
                     },
                     source=FactSource.LISTENING_SUMMARY,
                     insight_type=InsightType.DAILY_LISTENING,
+                    message_key=FactMessageKey.DAILY_TOP_ARTIST,
                 )
             )
 
@@ -85,6 +89,7 @@ class KnowledgeEngine:
                     },
                     source=FactSource.LISTENING_SUMMARY,
                     insight_type=InsightType.DAILY_LISTENING,
+                    message_key=FactMessageKey.DAILY_TOP_SONG,
                 )
             )
 
@@ -137,6 +142,7 @@ class KnowledgeEngine:
                         },
                         source=FactSource.LISTENING_SUMMARY_COMPARISON,
                         insight_type=InsightType.TREND,
+                        message_key=FactMessageKey.TREND_TOP_ARTIST_CHANGED,
                     )
                 )
 
@@ -164,6 +170,7 @@ class KnowledgeEngine:
                         },
                         source=FactSource.LISTENING_SUMMARY_COMPARISON,
                         insight_type=InsightType.TREND,
+                        message_key=FactMessageKey.TREND_TOP_SONG_CHANGED,
                     )
                 )
 
@@ -225,11 +232,17 @@ def _listening_time_trend_fact(
             metadata=metadata,
             source=FactSource.LISTENING_SUMMARY_COMPARISON,
             insight_type=InsightType.TREND,
+            message_key=FactMessageKey.TREND_LISTENING_TIME_ZERO_BASELINE,
         )
 
     percentage_change = round(abs(change) / previous_value * 100)
     metadata["percentage_change"] = percentage_change if change > 0 else -percentage_change
     direction = "increased" if change > 0 else "decreased"
+    message_key = (
+        FactMessageKey.TREND_LISTENING_TIME_INCREASED
+        if change > 0
+        else FactMessageKey.TREND_LISTENING_TIME_DECREASED
+    )
     return KnowledgeFact(
         category=FactCategory.LISTENING_TIME_CHANGE,
         importance=ImportanceLevel.MEDIUM,
@@ -240,6 +253,7 @@ def _listening_time_trend_fact(
         metadata=metadata,
         source=FactSource.LISTENING_SUMMARY_COMPARISON,
         insight_type=InsightType.TREND,
+        message_key=message_key,
     )
 
 
@@ -251,6 +265,11 @@ def _playback_count_trend_fact(previous_value: int, current_value: int) -> Knowl
     change = current_value - previous_value
     track_label = "track" if abs(change) == 1 else "tracks"
     comparison = "more" if change > 0 else "fewer"
+    message_key = (
+        FactMessageKey.TREND_PLAYBACK_MORE
+        if change > 0
+        else FactMessageKey.TREND_PLAYBACK_FEWER
+    )
     return KnowledgeFact(
         category=FactCategory.PLAYBACK_COUNT_CHANGE,
         importance=ImportanceLevel.MEDIUM,
@@ -265,6 +284,7 @@ def _playback_count_trend_fact(previous_value: int, current_value: int) -> Knowl
         },
         source=FactSource.LISTENING_SUMMARY_COMPARISON,
         insight_type=InsightType.TREND,
+        message_key=message_key,
     )
 
 
@@ -296,6 +316,7 @@ def _focused_listening_fact(summary: ListeningSummary) -> KnowledgeFact | None:
         tags=("behavior", "artist_focus"),
         source=FactSource.LISTENING_SUMMARY,
         insight_type=InsightType.BEHAVIOR,
+        message_key=FactMessageKey.INSIGHT_FOCUSED_LISTENING,
     )
 
 
@@ -326,6 +347,7 @@ def _listening_time_insight_fact(
             tags=("trend", "high_listening"),
             source=FactSource.LISTENING_SUMMARY_COMPARISON,
             insight_type=InsightType.TREND,
+            message_key=FactMessageKey.INSIGHT_HEAVY_ZERO_BASELINE,
         )
 
     change_fraction = (current_value - previous_value) / previous_value
@@ -342,6 +364,11 @@ def _listening_time_insight_fact(
     title = "Heavy Listening" if is_heavy_listening else "Light Listening"
     comparison = "higher" if is_heavy_listening else "lower"
     tag = "high_listening" if is_heavy_listening else "low_listening"
+    message_key = (
+        FactMessageKey.INSIGHT_HEAVY
+        if is_heavy_listening
+        else FactMessageKey.INSIGHT_LIGHT
+    )
     return KnowledgeFact(
         category=category,
         importance=ImportanceLevel.HIGH,
@@ -356,6 +383,7 @@ def _listening_time_insight_fact(
         tags=("trend", tag),
         source=FactSource.LISTENING_SUMMARY_COMPARISON,
         insight_type=InsightType.TREND,
+        message_key=message_key,
     )
 
 
@@ -385,6 +413,7 @@ def _stable_favorite_fact(
         tags=("behavior", "artist_loyalty"),
         source=FactSource.LISTENING_SUMMARY_COMPARISON,
         insight_type=InsightType.BEHAVIOR,
+        message_key=FactMessageKey.INSIGHT_STABLE_TOP_ARTIST,
     )
 
 

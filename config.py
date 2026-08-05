@@ -12,9 +12,12 @@ class SpotifySettings:
     redirect_uri: str
 
 
-def load_spotify_settings() -> SpotifySettings:
+def load_environment() -> None:
+    """Load the application's dotenv file once at process startup."""
     load_dotenv()
 
+
+def load_spotify_settings() -> SpotifySettings:
     client_id = getenv("SPOTIPY_CLIENT_ID")
     client_secret = getenv("SPOTIPY_CLIENT_SECRET")
     redirect_uri = getenv("SPOTIPY_REDIRECT_URI")
@@ -42,7 +45,6 @@ def load_spotify_settings() -> SpotifySettings:
 
 def load_musicmind_timezone() -> str:
     """Return the configured canonical IANA timezone name."""
-    load_dotenv()
     timezone_name = getenv("MUSICMIND_TIMEZONE")
     if not timezone_name:
         raise RuntimeError(

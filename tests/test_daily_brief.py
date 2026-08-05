@@ -2,6 +2,7 @@ import pytest
 
 from music_ai.ai.daily_brief import DailyBrief
 from music_ai.ai.markdown_renderer import render_daily_brief
+from music_ai.localization import SupportedLocale
 
 
 def test_daily_brief_validates_provider_payload() -> None:
@@ -44,3 +45,40 @@ def test_markdown_renderer_uses_the_complete_daily_brief_structure() -> None:
     assert "## 🧠 Insight" in markdown
     assert "## 💡 Recommendation" in markdown
     assert markdown.endswith("See you tomorrow.")
+
+
+def test_markdown_renderer_localizes_chinese_headings_without_rewriting_body() -> None:
+    brief = DailyBrief(
+        greeting="你好。",
+        listening_summary=("Artist A 仍保持原名。",),
+        trend="最近趋势正文。",
+        insight="重点正文。",
+        recommendation="继续留意你的听歌记录。",
+        closing="明天见。",
+    )
+    markdown = render_daily_brief(brief, locale=SupportedLocale.ZH_CN)
+    assert markdown == """# MusicMind AI 每日报告
+
+## 👋 问候
+
+你好。
+
+## 🎵 听歌概览
+
+- Artist A 仍保持原名。
+
+## 📈 最近趋势
+
+最近趋势正文。
+
+## 🧠 重点发现
+
+重点正文。
+
+## 💡 温和建议
+
+继续留意你的听歌记录。
+
+## ✨ 结束语
+
+明天见。"""

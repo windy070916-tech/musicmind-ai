@@ -1,5 +1,7 @@
 """Central prompt templates for MusicMind LLM features."""
 
+from music_ai.localization.models import SupportedLocale, require_supported_locale
+
 SYSTEM_PROMPT = """You are MusicMind, a calm and insightful personal music companion.
 
 Your personality is warm, encouraging, curious, professional, and observant. Write
@@ -13,10 +15,10 @@ or future outcomes. Never use uncertainty to speculate, including "may", "might"
 
 The Recommendation field is a gentle reflection, not a music recommendation. Do not
 name an artist, song, album, playlist, genre, or activity in it. Do not tell the user
-to explore, revisit, try, play, or listen to anything. Use a brief, low-pressure line
-such as "Keep noticing what you return to most." or "Let tomorrow's listening unfold
-naturally." The Insight field must restate a supplied insight fact; when none is
-supplied, write "No additional pattern stands out yet."
+to explore, revisit, try, play, or listen to anything. Write one brief, low-pressure
+reflection grounded only in the documented listening. The Insight field must restate
+a supplied insight fact; when none is supplied, write one neutral sentence in the
+requested output language stating that no additional pattern stands out.
 
 Greeting and Closing must be warm but non-factual; do not describe the user's listening
 in either field. Keep them concrete and understated, never poetic or motivational.
@@ -46,3 +48,23 @@ support a trend or insight, say so plainly without speculating.
 Listening facts:
 {facts}
 """
+
+
+def build_system_prompt(locale: SupportedLocale) -> str:
+    """Append an explicit output-language instruction to the safety prompt."""
+    locale = require_supported_locale(locale)
+    if locale is SupportedLocale.ZH_CN:
+        instruction = (
+            "Write every user-visible JSON string value in natural Simplified Chinese.\n"
+            "Keep artist, track, album, and genre names exactly as supplied.\n"
+            "When no trend or insight is supported, write the neutral fallback in "
+            "natural Simplified Chinese."
+        )
+    else:
+        instruction = (
+            "Write every user-visible JSON string value in English.\n"
+            "Keep artist, track, album, and genre names exactly as supplied.\n"
+            "When no trend or insight is supported, write the neutral fallback in "
+            "English."
+        )
+    return f"{SYSTEM_PROMPT}\n\n{instruction}"

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from types import MappingProxyType
 
+from music_ai.knowledge.message_keys import FactMessageKey
+
 
 class FactCategory(StrEnum):
     """Stable categories for reusable knowledge facts."""
@@ -81,7 +83,12 @@ class KnowledgeFact:
     severity: str | None = None
     insight_type: InsightType | str | None = None
     time_horizon: FactTimeHorizon | str = FactTimeHorizon.DAILY
+    message_key: FactMessageKey | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         """Protect metadata so a fact remains immutable after construction."""
+        if self.message_key is not None and not isinstance(
+            self.message_key, FactMessageKey
+        ):
+            raise TypeError("message_key must be FactMessageKey or None.")
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))

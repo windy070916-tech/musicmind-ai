@@ -6,26 +6,39 @@ import json
 from music_ai.ai.base import LLMProvider, create_llm_provider
 from music_ai.ai.daily_brief import DailyBrief
 from music_ai.ai.markdown_renderer import render_daily_brief
-from music_ai.ai.prompts import DAILY_REPORT_PROMPT, SYSTEM_PROMPT
+from music_ai.ai.prompts import DAILY_REPORT_PROMPT, build_system_prompt
 from music_ai.knowledge.models import KnowledgeFact
+from music_ai.localization.models import SupportedLocale, require_supported_locale
 
 
 class ReportGenerator:
     """Turn knowledge facts into a Markdown report through an LLM provider."""
 
-    def __init__(self, provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        provider: LLMProvider | None = None,
+        *,
+        locale: SupportedLocale = SupportedLocale.EN_US,
+    ) -> None:
         """Use an injected provider or create the one selected by configuration."""
+        self._locale = require_supported_locale(locale)
         self._provider = provider or create_llm_provider()
 
     def generate_daily_brief(self, facts: Sequence[KnowledgeFact]) -> DailyBrief:
         """Generate a validated, presentation-independent Daily Brief from facts."""
         user_prompt = DAILY_REPORT_PROMPT.format(facts=_format_facts(facts))
-        response = self._provider.generate(SYSTEM_PROMPT, user_prompt)
+        response = self._provider.generate(
+            build_system_prompt(self._locale),
+            user_prompt,
+        )
         return _parse_daily_brief(response)
 
     def generate_daily_report(self, facts: Sequence[KnowledgeFact]) -> str:
         """Generate the Markdown rendering of a structured Daily Brief."""
-        return render_daily_brief(self.generate_daily_brief(facts))
+        return render_daily_brief(
+            self.generate_daily_brief(facts),
+            locale=self._locale,
+        )
 
 
 def _format_facts(facts: Sequence[KnowledgeFact]) -> str:

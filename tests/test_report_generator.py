@@ -5,9 +5,16 @@ import pytest
 
 from music_ai.ai.base import LLMProvider
 from music_ai.ai.daily_brief import DailyBrief
-from music_ai.ai.prompts import SYSTEM_PROMPT
+from music_ai.ai.prompts import SYSTEM_PROMPT, build_system_prompt
 from music_ai.ai.report_generator import ReportGenerator
-from music_ai.knowledge import FactCategory, ImportanceLevel, InsightType, KnowledgeFact
+from music_ai.knowledge import (
+    FactCategory,
+    FactMessageKey,
+    ImportanceLevel,
+    InsightType,
+    KnowledgeFact,
+)
+from music_ai.localization import SupportedLocale
 
 
 @dataclass
@@ -45,7 +52,9 @@ def test_report_generator_builds_prompt_from_knowledge_facts() -> None:
 
     assert report.startswith("# MusicMind Daily Brief")
     assert "## 🎵 Listening Summary" in report
-    assert provider.system_prompt == SYSTEM_PROMPT
+    assert provider.system_prompt == build_system_prompt(SupportedLocale.EN_US)
+    assert provider.system_prompt.startswith(SYSTEM_PROMPT)
+    assert "every user-visible JSON string value in English" in provider.system_prompt
     assert "The Recommendation field is a gentle reflection" in provider.system_prompt
     assert "Greeting and Closing must be warm but non-factual" in provider.system_prompt
     assert provider.user_prompt is not None
@@ -63,6 +72,55 @@ def test_report_generator_handles_empty_fact_list() -> None:
 
     assert provider.user_prompt is not None
     assert "- No listening facts are available." in provider.user_prompt
+
+
+def test_chinese_report_uses_language_instruction_and_canonical_fact_input() -> None:
+    provider = FakeProvider()
+    fact = KnowledgeFact(
+        category=FactCategory.LISTENING_TIME,
+        importance=ImportanceLevel.MEDIUM,
+        title="Listening Time",
+        description="You listened to music for 2 hours today.",
+        message_key=FactMessageKey.DAILY_LISTENING_TIME,
+    )
+    report = ReportGenerator(
+        provider,
+        locale=SupportedLocale.ZH_CN,
+    ).generate_daily_report([fact])
+    assert report.startswith("# MusicMind AI 每日报告")
+    assert "natural Simplified Chinese" in (provider.system_prompt or "")
+    assert "Keep artist, track, album, and genre names exactly as supplied." in (
+        provider.system_prompt or ""
+    )
+    assert "You listened to music for 2 hours today." in (provider.user_prompt or "")
+    assert "daily.listening_time" not in (provider.user_prompt or "")
+
+
+def test_locale_prompts_are_stable_and_do_not_leak_fixed_english_output() -> None:
+    original = SYSTEM_PROMPT
+
+    chinese_first = build_system_prompt(SupportedLocale.ZH_CN)
+    english_second = build_system_prompt(SupportedLocale.EN_US)
+    english_first = build_system_prompt(SupportedLocale.EN_US)
+    chinese_second = build_system_prompt(SupportedLocale.ZH_CN)
+
+    assert SYSTEM_PROMPT == original
+    assert chinese_first == chinese_second
+    assert english_first == english_second
+    assert "natural Simplified Chinese" in chinese_first
+    assert "every user-visible JSON string value in English" in english_first
+    assert "Keep artist, track, album, and genre names exactly as supplied." in (
+        chinese_first
+    )
+    assert "neutral fallback in natural Simplified Chinese" in chinese_first
+    assert "neutral fallback in English" in english_first
+    for prompt in (chinese_first, english_first):
+        assert "Use only the supplied listening facts." in prompt
+        assert "Return only valid JSON with exactly these fields" in prompt
+        assert "The Recommendation field is a gentle reflection" in prompt
+    assert "No additional pattern stands out yet." not in chinese_first
+    assert "Keep noticing what you return to most." not in chinese_first
+    assert "Let tomorrow's listening unfold naturally." not in chinese_first
 
 
 def test_report_generator_exposes_a_structured_daily_brief() -> None:

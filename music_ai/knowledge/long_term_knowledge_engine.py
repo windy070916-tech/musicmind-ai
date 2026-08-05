@@ -8,6 +8,7 @@ from music_ai.knowledge.models import (
     InsightType,
     KnowledgeFact,
 )
+from music_ai.knowledge.message_keys import FactMessageKey
 from music_ai.temporal.long_term_models import (
     ArtistBreadthEvidence,
     ArtistConsistencyEvidence,
@@ -159,6 +160,7 @@ def _consistency_fact(
         date_range=(context.start_date.isoformat(), context.end_date.isoformat()),
         insight_type=InsightType.BEHAVIOR,
         time_horizon=FactTimeHorizon.LONG_TERM,
+        message_key=FactMessageKey.LONG_TERM_ARTIST_CONSISTENCY,
     )
 
 
@@ -193,6 +195,7 @@ def _concentration_fact(
         date_range=(context.start_date.isoformat(), context.end_date.isoformat()),
         insight_type=InsightType.BEHAVIOR,
         time_horizon=FactTimeHorizon.LONG_TERM,
+        message_key=FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION,
     )
 
 
@@ -224,6 +227,7 @@ def _breadth_fact(
         date_range=(context.start_date.isoformat(), context.end_date.isoformat()),
         insight_type=InsightType.BEHAVIOR,
         time_horizon=FactTimeHorizon.LONG_TERM,
+        message_key=FactMessageKey.LONG_TERM_ARTIST_BREADTH,
     )
 
 

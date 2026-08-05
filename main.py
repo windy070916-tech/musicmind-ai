@@ -1,9 +1,11 @@
 from collections.abc import Callable, Sequence
 from datetime import datetime, time, timedelta, timezone
+from os import environ
+import sys
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from config import load_musicmind_timezone, load_spotify_settings
+from config import load_environment, load_musicmind_timezone, load_spotify_settings
 from music_ai.ai.report_generator import ReportGenerator
 from music_ai.analytics.listening_analytics import ListeningAnalytics, ListeningSummary
 from music_ai.analytics.listening_profile import DailyListeningProfile
@@ -13,6 +15,15 @@ from music_ai.knowledge.long_term_knowledge_engine import LongTermKnowledgeEngin
 from music_ai.knowledge.models import KnowledgeFact
 from music_ai.knowledge.recent_knowledge_engine import RecentKnowledgeEngine
 from music_ai.memory.engine import MemoryEngine
+from music_ai.localization import (
+    SupportedLocale,
+    UnsupportedLocaleError,
+    resolve_locale,
+    validate_localization_catalogs,
+)
+from music_ai.localization.catalog import ui_text
+from music_ai.localization.fact_localizer import localize_fact
+from music_ai.localization.models import UiMessageKey
 from music_ai.models.artist import Artist
 from music_ai.models.play_history import PlayHistory
 from music_ai.models.song import Song
@@ -28,7 +39,7 @@ from music_ai.repository.play_history_repository import PlayHistoryRepository
 from music_ai.repository.song_repository import SongRepository
 from music_ai.repository.song_artist_repository import SongArtistRepository
 from music_ai.presentation.narrative_markdown_renderer import render_daily_narrative
-from music_ai.spotify.auth import SpotifyAuth
+from music_ai.spotify.auth import OAuthUserMessages, SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 from music_ai.temporal.analytics import TemporalListeningAnalytics
 from music_ai.temporal.long_term_analytics import LongTermListeningAnalytics
@@ -39,11 +50,25 @@ _COMPARISON_WINDOW_DAYS = 7
 _LONG_TERM_WINDOW_DAYS = 30
 
 
-def main() -> None:
+def main(argv: Sequence[str] = ()) -> int:
     """Import the authenticated user's Spotify playback history into MusicMind."""
+    load_environment()
+    try:
+        locale = resolve_locale(
+            argv,
+            environ,
+            is_tty=sys.stdin.isatty(),
+            read_input=input,
+            write_output=print,
+        )
+    except UnsupportedLocaleError as error:
+        print(error, file=sys.stderr)
+        return 2
+    validate_localization_catalogs()
+
     settings = load_spotify_settings()
     timezone_name = load_musicmind_timezone()
-    auth = SpotifyAuth(settings)
+    auth = SpotifyAuth(settings, messages=_oauth_user_messages(locale))
     token = auth.authenticate()
 
     client = SpotifyClient(token)
@@ -54,8 +79,8 @@ def main() -> None:
     play_history_repository = PlayHistoryRepository(database)
     latest_played_at = play_history_repository.latest_played_at()
 
-    print("Spotify Login Success")
-    recent_tracks = _download_recent_tracks(client, latest_played_at)
+    print(ui_text(locale, UiMessageKey.SPOTIFY_LOGIN_SUCCESS))
+    recent_tracks = _download_recent_tracks(client, latest_played_at, locale=locale)
     songs, play_history = _parse_recent_tracks(recent_tracks)
     _persist_song_metadata(database, songs)
     _enrich_artist_metadata(client, database, songs)
@@ -65,8 +90,14 @@ def main() -> None:
         play_history_repository.save(record)
     imported_count = play_history_repository.count() - initial_count
 
-    print(f"Imported {imported_count} playback records.")
-    print("Database updated successfully.")
+    print(
+        ui_text(
+            locale,
+            UiMessageKey.IMPORTED_PLAYBACK_RECORDS,
+            count=imported_count,
+        )
+    )
+    print(ui_text(locale, UiMessageKey.DATABASE_UPDATED))
     analytics_time = datetime.now(timezone.utc)
     previous_summary, current_summary, current_profile = _daily_listening_summaries(
         database,
@@ -91,26 +122,37 @@ def main() -> None:
         facts,
         recent_facts=recent_facts,
         long_term_facts=long_term_facts,
+        locale=locale,
     )
+    return 0
 
 
 def _download_recent_tracks(
-    client: SpotifyClient, latest_played_at: datetime | None
+    client: SpotifyClient,
+    latest_played_at: datetime | None,
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
 ) -> list[dict[str, Any]]:
     """Download recent tracks, optionally only after the latest stored playback."""
     if latest_played_at is None:
-        print("First synchronization.")
-        print("Downloading recent playback history...")
+        print(ui_text(locale, UiMessageKey.FIRST_SYNCHRONIZATION))
+        print(ui_text(locale, UiMessageKey.DOWNLOADING_RECENT_HISTORY))
         return client.recent_tracks(limit=50)
 
-    print("Last synchronized playback:")
+    print(ui_text(locale, UiMessageKey.LAST_SYNCHRONIZED_PLAYBACK))
     print(latest_played_at.isoformat())
-    print("Checking Spotify...")
+    print(ui_text(locale, UiMessageKey.CHECKING_SPOTIFY))
     tracks = client.recent_tracks(
         limit=50,
         after=_to_unix_timestamp_ms(latest_played_at),
     )
-    print(f"Found {len(tracks)} new playback records.")
+    print(
+        ui_text(
+            locale,
+            UiMessageKey.FOUND_NEW_PLAYBACK_RECORDS,
+            count=len(tracks),
+        )
+    )
     return tracks
 
 
@@ -246,18 +288,26 @@ def _recent_listening_facts(
 def _print_daily_outputs(
     listening_profile: DailyListeningProfile,
     facts: list[KnowledgeFact],
-    report_generator_factory: Callable[[], ReportGenerator] = ReportGenerator,
+    report_generator_factory: Callable[[SupportedLocale], ReportGenerator] | None = None,
     *,
     recent_facts: Sequence[KnowledgeFact] = (),
     long_term_facts: Sequence[KnowledgeFact] = (),
+    locale: SupportedLocale = SupportedLocale.EN_US,
 ) -> None:
     """Print deterministic Narrative output before generating the existing AI report."""
     narrative = NarrativeEngine(
         listening_profile, (*facts, *recent_facts, *long_term_facts)
     ).compose()
-    _print_daily_narrative(render_daily_narrative(narrative))
-    report_generator = report_generator_factory()
-    _print_ai_report(report_generator.generate_daily_report(facts))
+    _print_daily_narrative(render_daily_narrative(narrative, locale=locale))
+    report_generator = (
+        report_generator_factory(locale)
+        if report_generator_factory is not None
+        else ReportGenerator(locale=locale)
+    )
+    _print_ai_report(
+        report_generator.generate_daily_report(facts),
+        locale=locale,
+    )
 
 
 def _print_daily_narrative(report: str) -> None:
@@ -268,51 +318,86 @@ def _print_daily_narrative(report: str) -> None:
     print("=" * 40)
 
 
-def _print_daily_facts(facts: list[KnowledgeFact]) -> None:
+def _print_daily_facts(
+    facts: list[KnowledgeFact],
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> None:
     """Print presentation-ready facts generated by the knowledge layer."""
     print()
     print("=" * 40)
-    print("MusicMind Daily Facts")
+    print(ui_text(locale, UiMessageKey.DAILY_FACTS_LABEL))
     print("=" * 40)
     for fact in facts:
-        print(f"• {fact.description}")
+        print(f"• {localize_fact(fact, locale).description}")
     print("=" * 40)
 
 
-def _print_daily_trends(facts: list[KnowledgeFact]) -> None:
+def _print_daily_trends(
+    facts: list[KnowledgeFact],
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> None:
     """Print trend facts generated by the knowledge layer."""
     print()
     print("=" * 40)
-    print("MusicMind Daily Trends")
+    print(ui_text(locale, UiMessageKey.DAILY_TRENDS_LABEL))
     print("=" * 40)
     if not facts:
-        print("• No changes from yesterday.")
+        print(f"• {ui_text(locale, UiMessageKey.NO_DAILY_CHANGES)}")
     for fact in facts:
-        print(f"• {fact.description}")
+        print(f"• {localize_fact(fact, locale).description}")
     print("=" * 40)
 
 
-def _print_insight_facts(facts: list[KnowledgeFact]) -> None:
+def _print_insight_facts(
+    facts: list[KnowledgeFact],
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> None:
     """Print higher-level behavioral facts generated by the knowledge layer."""
     print()
     print("=" * 40)
-    print("MusicMind Insight Facts")
+    print(ui_text(locale, UiMessageKey.INSIGHT_FACTS_LABEL))
     print("=" * 40)
     if not facts:
-        print("• No behavioral insights for today.")
+        print(f"• {ui_text(locale, UiMessageKey.NO_DAILY_INSIGHTS)}")
     for fact in facts:
-        print(f"• {fact.description}")
+        print(f"• {localize_fact(fact, locale).description}")
     print("=" * 40)
 
 
-def _print_ai_report(report: str) -> None:
+def _print_ai_report(
+    report: str,
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> None:
     """Print the Markdown report generated by the configured LLM provider."""
     print()
     print("=" * 40)
-    print("MusicMind AI Report")
+    print(ui_text(locale, UiMessageKey.AI_REPORT_LABEL))
     print("=" * 40)
     print(report)
     print("=" * 40)
+
+
+def _oauth_user_messages(locale: SupportedLocale) -> OAuthUserMessages:
+    """Build immutable localized OAuth copy at the application boundary."""
+    return OAuthUserMessages(
+        open_url=ui_text(locale, UiMessageKey.OAUTH_OPEN_URL),
+        unknown_callback_path=ui_text(
+            locale,
+            UiMessageKey.OAUTH_UNKNOWN_CALLBACK_PATH,
+        ),
+        authorization_failed=ui_text(
+            locale,
+            UiMessageKey.OAUTH_AUTHORIZATION_FAILED,
+            error="{error}",
+        ),
+        invalid_state=ui_text(locale, UiMessageKey.OAUTH_INVALID_STATE),
+        missing_code=ui_text(locale, UiMessageKey.OAUTH_MISSING_CODE),
+        success=ui_text(locale, UiMessageKey.OAUTH_SUCCESS),
+    )
 
 
 def _parse_recent_tracks(
@@ -383,4 +468,4 @@ def _batches(items: list[Artist], size: int) -> list[list[Artist]]:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main(sys.argv[1:]))

@@ -5,7 +5,6 @@ from os import getenv
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 
 
 class LLMProvider(ABC):
@@ -18,7 +17,6 @@ class LLMProvider(ABC):
 
 def create_llm_provider() -> LLMProvider:
     """Create the configured provider without exposing it to business logic."""
-    load_dotenv()
     provider_name = getenv("LLM_PROVIDER", "").strip().lower()
 
     if provider_name == "deepseek":

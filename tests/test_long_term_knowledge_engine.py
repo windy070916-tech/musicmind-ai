@@ -9,6 +9,7 @@ from music_ai.knowledge import (
     FactCategory,
     FactSource,
     FactTimeHorizon,
+    FactMessageKey,
     LongTermKnowledgeEngine,
 )
 from music_ai.temporal import (
@@ -134,6 +135,11 @@ def test_exact_thresholds_create_one_fact_per_concept_from_evidence_only() -> No
         "artist_consistency",
         "listening_concentration",
         "artist_breadth",
+    ]
+    assert [fact.message_key for fact in facts] == [
+        FactMessageKey.LONG_TERM_ARTIST_CONSISTENCY,
+        FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION,
+        FactMessageKey.LONG_TERM_ARTIST_BREADTH,
     ]
     assert facts[0].metadata["subject_key"] == "spotify:artist-a"
     assert facts[1].metadata["subject_key"] == "listening:all_artists"

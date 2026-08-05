@@ -59,6 +59,14 @@ and selected fact descriptions. When a thread exists, Presentation prints a
 section follows it and also preserves Narrative order. Presentation does not filter,
 rank, or deduplicate either collection.
 
+Narrative remains locale-neutral. It continues sorting and selecting canonical
+`KnowledgeFact` values, including its existing title/description tie-breakers. The
+deterministic renderer receives the resolved locale only after composition and
+localizes selected fact descriptions at render time. Consequently `zh-CN` and
+`en-US` use the same observations, order, limits, and cross-horizon deduplication.
+Locale is not stored in `DailyNarrative`, either thread contract, or Narrative
+metadata.
+
 The AI Daily Brief remains an independent optional interpretation path. Its legacy
 Knowledge facts are based on `ListeningSummary`, while profile artist rankings use
 primary-artist attribution, so the two outputs may temporarily differ for

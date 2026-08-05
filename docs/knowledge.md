@@ -16,10 +16,24 @@ one reusable fact and includes:
 - `confidence`, `tags`, `source`, `date_range`, `severity`, and `insight_type`:
   extension fields for later sprints.
 - `time_horizon`: the explicit period horizon represented by the fact.
+- `message_key`: an optional semantic `FactMessageKey` for the wording branch
+  already selected by a built-in Knowledge engine.
 
 The dataclass remains presentation-independent. Reports, dashboards, and AI prompts
 can consume the same fact object without forcing Knowledge to know where the fact
 will be displayed.
+
+`title` and `description` remain required canonical English compatibility fields.
+Every built-in fact supplies `message_key`, while custom and legacy facts may omit
+it. The key is excluded from dataclass equality and is never stored inside metadata.
+It does not change thresholds, eligibility, identity, ordering, sources, horizons,
+date ranges, `subject_key`, or `concept_key`.
+
+Knowledge never receives a selected locale and never imports Localization. English
+rendering uses the canonical fields. Chinese wording is produced later from the
+semantic key and immutable metadata, after Narrative selection. A custom fact with
+no message key can render in `en-US` but fails explicitly instead of falling back to
+English inside a `zh-CN` report.
 
 ## Time Horizon
 
