@@ -51,11 +51,20 @@ Temporal Analytics consumes a caller-bounded `ListeningMemory` as read-only
 evidence. It compares explicit half-open local-date windows contained within that
 Memory and preserves absent snapshot dates as gaps in its output.
 
+The Daily runtime performs one longitudinal range read over `[D-60,D+1)`. The same
+sparse `ListeningMemory` serves the existing Recent current/comparison windows,
+Sprint 3C's state and prefix, and Sprint 3E's adjacent Previous and Current windows.
+The range read returns only stored snapshots and does not fill gaps. Its declared
+bounds support containment validation, but do not prove which repository call
+created the value or why a date is absent; runtime integration owns verification of
+the one-call boundary.
+
 This does not give Memory interpretation responsibilities. Memory does not choose
-recent or comparison periods, calculate continuity or emergence, or decide whether
-evidence is meaningful. It also does not call Temporal Analytics: the application
-loads the required range and passes it downstream. Temporal analysis has no capture,
-rebuild, upsert, or other Memory lifecycle side effects.
+Recent, state, prefix, Previous, or Current periods; calculate continuity, state, or
+evolution; or decide whether evidence is meaningful. It also does not call Temporal
+Analytics: the application loads the required range and passes it downstream.
+Temporal analysis has no capture, rebuild, upsert, or other Memory lifecycle side
+effects.
 
 ## Scope
 
@@ -69,3 +78,7 @@ duration uses the existing primary-artist attribution rule preserved in each
 It currently contains no favorite, streak, rediscovery, session, or preference
 classification. It represents listening recorded by MusicMind and is not a
 guarantee of complete Spotify account history.
+
+Sprint 3E adds no Memory fields, requested-range provenance, database schema,
+snapshot-version, serializer, persistence, automatic backfill, or rebuild behavior.
+Existing stored snapshots remain compatible.

@@ -315,3 +315,31 @@ def test_long_term_evidence_is_frozen_and_snapshots_collections() -> None:
     assert isinstance(evidence.gap_dates, tuple)
     with pytest.raises(FrozenInstanceError):
         evidence.recorded_day_count = 2  # type: ignore[misc]
+
+
+def test_one_day_window_preserves_the_released_empty_prefix_contract() -> None:
+    start = date(2026, 7, 1)
+    evidence = LongTermListeningAnalytics().analyze(
+        _memory(
+            start,
+            start + timedelta(days=1),
+            (_snapshot(start, (("artist-a", "Artist A", 100),)),),
+        ),
+        start_date=start,
+        end_date=start + timedelta(days=1),
+    )
+
+    consistency = evidence.artist_consistency[0]
+    assert consistency.prefix_appearance_day_count == 0
+    assert consistency.prefix_listening_day_count == 0
+    assert consistency.prefix_closed_supporting_day_count == 0
+    assert consistency.prefix_aggregate_duration_ms == 0
+    assert consistency.prefix_appearance_share == 0.0
+    assert consistency.prefix_duration_share == 0.0
+    assert consistency.prefix_evidence_sufficient is False
+    assert evidence.listening_concentration.prefix_distinct_artist_count == 0
+    assert evidence.listening_concentration.prefix_top_one_duration_share == 0.0
+    assert evidence.listening_concentration.prefix_top_five_duration_share == 0.0
+    assert evidence.artist_breadth.prefix_unique_artist_count == 0
+    assert evidence.artist_breadth.prefix_artist_day_appearance_count == 0
+    assert evidence.artist_breadth.prefix_artists_per_listening_day == 0.0

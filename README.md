@@ -1,10 +1,11 @@
 # MusicMind AI
 
 MusicMind imports Spotify listening data and builds deterministic daily, recent,
-and long-term listening intelligence. Analytics produces statistics, Listening
-Memory preserves versioned daily evidence, Temporal Analytics evaluates explicit
-bounded periods, Knowledge interprets evidence, and Narrative composes the
-deterministic product output. A configurable LLM report remains separate.
+long-term state, and long-term evolution intelligence. Analytics produces
+statistics, Listening Memory preserves versioned daily evidence, Temporal Analytics
+evaluates explicit bounded periods, Knowledge interprets evidence, and Narrative
+composes the deterministic product output. A configurable LLM report remains
+separate.
 
 ## What It Does
 
@@ -96,6 +97,7 @@ back to the local callback server, then the app imports playback history into
 docs/
     architecture.md
     knowledge.md
+    localization.md
     memory.md
     narrative.md
     temporal.md
@@ -113,14 +115,18 @@ music_ai/
     temporal/
         models.py
         analytics.py
+        window_statistics.py
         long_term_models.py
         long_term_analytics.py
+        long_term_evolution_models.py
+        long_term_evolution_analytics.py
     knowledge/
         message_keys.py
         models.py
         knowledge_engine.py
         recent_knowledge_engine.py
         long_term_knowledge_engine.py
+        long_term_evolution_knowledge_engine.py
     narrative/
         models.py
         engine.py
@@ -166,17 +172,25 @@ README.md
 ## Scope
 
 Raw playback history remains authoritative. Analytics calculates deterministic
-daily profiles, while Listening Memory stores rebuildable daily snapshots. Recent
-and long-term Temporal Analytics use separate immutable evidence contracts. The
-long-term contract describes artist consistency, listening concentration, and
-artist breadth. Neither analytics path owns default periods, persistence, prose, or
-product-meaning thresholds.
+daily profiles, while Listening Memory stores rebuildable, sparse daily snapshots.
+Each run makes one longitudinal Memory read over `[D-60,D+1)`. That one value serves
+the existing Recent comparison, Sprint 3C's current 30-day state and overlapping
+29-day novelty prefix, and Sprint 3E's adjacent Previous `[D-60,D-30)` versus Current
+`[D-30,D)` evolution comparison. The open local day `D` is eligible only for the
+existing Recent window.
 
-Knowledge interprets analytics and temporal evidence into reusable dataclass facts.
-Narrative selects recent and long-term observations into separate bounded threads.
-The application owns the 30-calendar-day long-term runtime window and excludes the
-current open local day. Recent and long-term facts remain outside the separate AI
-report path.
+Sprint 3E compares artist attributable-duration share, top-five attributable
+listening concentration, and artists per listening day. Artist duration keeps the
+existing primary-artist identity rule; blank and unknown artists do not enter the
+Sprint 3E attributable denominator. Temporal owns structural sufficiency and exact
+calculations, Knowledge owns product thresholds, and Narrative owns deterministic
+priority, suppression, and semantic deduplication.
+
+The application keeps Recent, Sprint 3C state, and Sprint 3E evolution facts
+separate until Narrative composition. All three remain outside the AI Daily Brief,
+which continues receiving only daily, trend, and existing insight facts. Sprint 3E
+adds no database migration, Memory schema or snapshot-version change, serializer
+change, persistence, automatic backfill, or display history.
 
 See `docs/architecture.md`, `docs/memory.md`, `docs/temporal.md`,
 `docs/knowledge.md`, `docs/narrative.md`, and `docs/localization.md` for layer

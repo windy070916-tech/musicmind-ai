@@ -19,9 +19,11 @@ from music_ai.localization.catalog import (
     ChineseFactTemplate,
     _UI_CATALOGS,
     _UI_PLACEHOLDER_CONTRACT,
+    chinese_fact_template,
 )
 from music_ai.localization.formatters import (
     format_artist_count,
+    format_artists_per_listening_day,
     format_compact_duration,
     format_listening_day_count,
     format_percentage,
@@ -88,6 +90,32 @@ _FACT_METADATA = {
         "listening_day_count": 16,
         "single_day_artist_count": 8,
     },
+    FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED: {
+        "artist_name": "Artist A",
+        "previous_value": 0.2,
+        "current_value": 0.4,
+    },
+    FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_DECREASED: {
+        "artist_name": "Artist A",
+        "previous_value": 0.6,
+        "current_value": 0.4,
+    },
+    FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_INCREASED: {
+        "previous_value": 1.65,
+        "current_value": 2.25,
+    },
+    FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_DECREASED: {
+        "previous_value": 2.25,
+        "current_value": 1.65,
+    },
+    FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_INCREASED: {
+        "previous_value": 0.5,
+        "current_value": 0.7,
+    },
+    FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_DECREASED: {
+        "previous_value": 0.7,
+        "current_value": 0.5,
+    },
 }
 
 
@@ -140,6 +168,16 @@ def test_catalog_validation_detects_temporary_missing_entries() -> None:
         validate_localization_catalogs(
             ui_catalogs=complete_ui,
             chinese_fact_templates=incomplete_facts,
+        )
+
+    incomplete_evolution_facts = dict(complete_facts)
+    incomplete_evolution_facts.pop(
+        FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED
+    )
+    with pytest.raises(MissingTranslationError, match="missing"):
+        validate_localization_catalogs(
+            ui_catalogs=complete_ui,
+            chinese_fact_templates=incomplete_evolution_facts,
         )
 
     invalid_declaration = dict(complete_facts)
@@ -289,6 +327,142 @@ def test_chinese_fact_wording_is_natural_and_preserves_dynamic_names() -> None:
 
 
 @pytest.mark.parametrize(
+    ("message_key", "metadata", "expected_title", "expected_description"),
+    [
+        (
+            FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED,
+            {
+                "artist_name": "周杰伦 / Beyoncé（Live?!）",
+                "previous_value": 0.2,
+                "current_value": 0.4,
+            },
+            "艺人占比上升",
+            "与前一个30天周期相比，周杰伦 / Beyoncé（Live?!）在可归因艺人"
+            "听歌时长中的占比从20%上升到40%。",
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_DECREASED,
+            {
+                "artist_name": "Artist A",
+                "previous_value": 0.6,
+                "current_value": 0.4,
+            },
+            "艺人占比下降",
+            "与前一个30天周期相比，Artist A在可归因艺人听歌时长中"
+            "的占比从60%下降到40%。",
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_INCREASED,
+            {"previous_value": 1.65, "current_value": 2.25},
+            "艺人广度增加",
+            "与前一个30天周期相比，平均每个听歌日涉及的艺人数从1.7增加到2.3。",
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_DECREASED,
+            {"previous_value": 2.25, "current_value": 1.65},
+            "艺人广度减少",
+            "与前一个30天周期相比，平均每个听歌日涉及的艺人数从2.3减少到1.7。",
+        ),
+        (
+            FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_INCREASED,
+            {"previous_value": 0.5, "current_value": 0.7},
+            "听歌集中度上升",
+            "与前一个30天周期相比，排名前五的艺人在可归因艺人听歌时长中"
+            "的占比从50%上升到70%。",
+        ),
+        (
+            FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_DECREASED,
+            {"previous_value": 0.7, "current_value": 0.5},
+            "听歌集中度下降",
+            "与前一个30天周期相比，排名前五的艺人在可归因艺人听歌时长中"
+            "的占比从70%下降到50%。",
+        ),
+    ],
+)
+def test_long_term_evolution_facts_localize_after_narrative_contract(
+    message_key: FactMessageKey,
+    metadata: dict[str, object],
+    expected_title: str,
+    expected_description: str,
+) -> None:
+    fact = _fact(message_key, metadata)
+
+    assert localize_fact(fact, SupportedLocale.EN_US).description == (
+        "Canonical description."
+    )
+    localized = localize_fact(fact, SupportedLocale.ZH_CN)
+
+    assert localized.title == expected_title
+    assert localized.description == expected_description
+    assert dict(fact.metadata) == metadata
+
+
+@pytest.mark.parametrize(
+    ("message_key", "required_metadata"),
+    [
+        (
+            FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED,
+            frozenset({"artist_name", "previous_value", "current_value"}),
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_DECREASED,
+            frozenset({"artist_name", "previous_value", "current_value"}),
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_INCREASED,
+            frozenset({"previous_value", "current_value"}),
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_DECREASED,
+            frozenset({"previous_value", "current_value"}),
+        ),
+        (
+            FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_INCREASED,
+            frozenset({"previous_value", "current_value"}),
+        ),
+        (
+            FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_DECREASED,
+            frozenset({"previous_value", "current_value"}),
+        ),
+    ],
+)
+def test_evolution_templates_declare_exact_required_metadata(
+    message_key: FactMessageKey,
+    required_metadata: frozenset[str],
+) -> None:
+    template = chinese_fact_template(message_key)
+    assert template.required_metadata == required_metadata
+
+
+@pytest.mark.parametrize(
+    ("message_key", "missing_key"),
+    [
+        (
+            FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED,
+            "artist_name",
+        ),
+        (
+            FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_INCREASED,
+            "previous_value",
+        ),
+        (
+            FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_INCREASED,
+            "current_value",
+        ),
+    ],
+)
+def test_evolution_localization_rejects_missing_metadata(
+    message_key: FactMessageKey,
+    missing_key: str,
+) -> None:
+    metadata = dict(_FACT_METADATA[message_key])
+    metadata.pop(missing_key)
+
+    with pytest.raises(LocalizationError, match=missing_key):
+        localize_fact(_fact(message_key, metadata), SupportedLocale.ZH_CN)
+
+
+@pytest.mark.parametrize(
     ("metadata", "expected"),
     [
         (
@@ -359,3 +533,59 @@ def test_locale_formatters_preserve_english_and_apply_chinese_classifiers() -> N
     assert format_listening_day_count(16, SupportedLocale.ZH_CN) == "16个听歌日"
     assert format_percentage(0.7, SupportedLocale.ZH_CN) == "70%"
     assert join_display_names(["A", "B"], SupportedLocale.ZH_CN) == "A、B"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (0, "0.0"),
+        (-0.0, "0.0"),
+        (1, "1.0"),
+        (1.64, "1.6"),
+        (1.65, "1.7"),
+        (2.25, "2.3"),
+    ],
+)
+@pytest.mark.parametrize(
+    "locale", [SupportedLocale.EN_US, SupportedLocale.ZH_CN]
+)
+def test_artists_per_listening_day_formatter_uses_round_half_up(
+    value: int | float,
+    expected: str,
+    locale: SupportedLocale,
+) -> None:
+    assert format_artists_per_listening_day(value, locale) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "error_type"),
+    [
+        (True, TypeError),
+        ("1.5", TypeError),
+        (-0.1, ValueError),
+        (float("nan"), ValueError),
+        (float("inf"), ValueError),
+        (float("-inf"), ValueError),
+    ],
+)
+def test_artists_per_listening_day_formatter_rejects_invalid_values(
+    value: object,
+    error_type: type[Exception],
+) -> None:
+    with pytest.raises(error_type):
+        format_artists_per_listening_day(
+            value, SupportedLocale.EN_US  # type: ignore[arg-type]
+        )
+
+
+def test_artists_per_listening_day_formatter_rejects_raw_locale() -> None:
+    with pytest.raises(TypeError, match="SupportedLocale"):
+        format_artists_per_listening_day(
+            1.5, "en-US"  # type: ignore[arg-type]
+        )
+
+
+def test_artists_per_listening_day_formatter_accepts_large_finite_values() -> None:
+    assert format_artists_per_listening_day(
+        1e100, SupportedLocale.EN_US
+    ) == f"1{'0' * 100}.0"

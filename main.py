@@ -11,6 +11,9 @@ from music_ai.analytics.listening_analytics import ListeningAnalytics, Listening
 from music_ai.analytics.listening_profile import DailyListeningProfile
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
+from music_ai.knowledge.long_term_evolution_knowledge_engine import (
+    LongTermEvolutionKnowledgeEngine,
+)
 from music_ai.knowledge.long_term_knowledge_engine import LongTermKnowledgeEngine
 from music_ai.knowledge.models import KnowledgeFact
 from music_ai.knowledge.recent_knowledge_engine import RecentKnowledgeEngine
@@ -42,6 +45,7 @@ from music_ai.presentation.narrative_markdown_renderer import render_daily_narra
 from music_ai.spotify.auth import OAuthUserMessages, SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 from music_ai.temporal.analytics import TemporalListeningAnalytics
+from music_ai.temporal.long_term_evolution_analytics import LongTermEvolutionAnalytics
 from music_ai.temporal.long_term_analytics import LongTermListeningAnalytics
 
 
@@ -107,7 +111,11 @@ def main(argv: Sequence[str] = ()) -> int:
     memory_engine = _capture_current_memory(
         database, timezone_name, analytics_time
     )
-    recent_facts, long_term_facts = _longitudinal_listening_facts(
+    (
+        recent_facts,
+        long_term_state_facts,
+        long_term_evolution_facts,
+    ) = _longitudinal_listening_facts(
         memory_engine,
         timezone_name,
         analytics_time,
@@ -116,12 +124,13 @@ def main(argv: Sequence[str] = ()) -> int:
     daily_facts = knowledge_engine.generate_daily_facts()
     trend_facts = knowledge_engine.generate_trend_facts()
     insight_facts = knowledge_engine.generate_insight_facts()
-    facts = daily_facts + trend_facts + insight_facts
+    ai_facts = daily_facts + trend_facts + insight_facts
     _print_daily_outputs(
         current_profile,
-        facts,
+        ai_facts,
         recent_facts=recent_facts,
-        long_term_facts=long_term_facts,
+        long_term_state_facts=long_term_state_facts,
+        long_term_evolution_facts=long_term_evolution_facts,
         locale=locale,
     )
     return 0
@@ -210,8 +219,12 @@ def _longitudinal_listening_facts(
     memory_engine: MemoryEngine,
     timezone_name: str,
     as_of: datetime,
-) -> tuple[list[KnowledgeFact], tuple[KnowledgeFact, ...]]:
-    """Build recent and long-term facts from one application-bounded Memory read."""
+) -> tuple[
+    list[KnowledgeFact],
+    tuple[KnowledgeFact, ...],
+    tuple[KnowledgeFact, ...],
+]:
+    """Build recent, state, and evolution facts from one bounded Memory read."""
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("Longitudinal analysis time must be timezone-aware.")
     local_date = as_of.astimezone(ZoneInfo(timezone_name)).date()
@@ -226,8 +239,13 @@ def _longitudinal_listening_facts(
     long_term_start_date = long_term_end_date - timedelta(
         days=_LONG_TERM_WINDOW_DAYS
     )
+    previous_end_date = long_term_start_date
+    previous_start_date = previous_end_date - timedelta(
+        days=_LONG_TERM_WINDOW_DAYS
+    )
     memory = memory_engine.load_range(
-        min(long_term_start_date, comparison_start_date), recent_end_date
+        previous_start_date,
+        recent_end_date,
     )
 
     recent_evidence = TemporalListeningAnalytics().analyze(
@@ -246,9 +264,21 @@ def _longitudinal_listening_facts(
         timezone_name=timezone_name,
         as_of=as_of,
     )
+    long_term_evolution_evidence = LongTermEvolutionAnalytics().analyze(
+        memory,
+        previous_start_date=previous_start_date,
+        previous_end_date=previous_end_date,
+        current_start_date=long_term_start_date,
+        current_end_date=long_term_end_date,
+        timezone_name=timezone_name,
+        as_of=as_of,
+    )
     return (
         RecentKnowledgeEngine(recent_evidence).generate_facts(),
         LongTermKnowledgeEngine(long_term_evidence).generate_facts(),
+        LongTermEvolutionKnowledgeEngine(
+            long_term_evolution_evidence
+        ).generate_facts(),
     )
 
 
@@ -287,16 +317,23 @@ def _recent_listening_facts(
 
 def _print_daily_outputs(
     listening_profile: DailyListeningProfile,
-    facts: list[KnowledgeFact],
+    ai_facts: list[KnowledgeFact],
     report_generator_factory: Callable[[SupportedLocale], ReportGenerator] | None = None,
     *,
     recent_facts: Sequence[KnowledgeFact] = (),
-    long_term_facts: Sequence[KnowledgeFact] = (),
+    long_term_state_facts: Sequence[KnowledgeFact] = (),
+    long_term_evolution_facts: Sequence[KnowledgeFact] = (),
     locale: SupportedLocale = SupportedLocale.EN_US,
 ) -> None:
     """Print deterministic Narrative output before generating the existing AI report."""
     narrative = NarrativeEngine(
-        listening_profile, (*facts, *recent_facts, *long_term_facts)
+        listening_profile,
+        (
+            *ai_facts,
+            *recent_facts,
+            *long_term_state_facts,
+            *long_term_evolution_facts,
+        ),
     ).compose()
     _print_daily_narrative(render_daily_narrative(narrative, locale=locale))
     report_generator = (
@@ -305,7 +342,7 @@ def _print_daily_outputs(
         else ReportGenerator(locale=locale)
     )
     _print_ai_report(
-        report_generator.generate_daily_report(facts),
+        report_generator.generate_daily_report(ai_facts),
         locale=locale,
     )
 

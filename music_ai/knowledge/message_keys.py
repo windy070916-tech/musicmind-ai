@@ -31,3 +31,21 @@ class FactMessageKey(StrEnum):
     LONG_TERM_ARTIST_CONSISTENCY = "long_term.artist_consistency"
     LONG_TERM_LISTENING_CONCENTRATION = "long_term.listening_concentration"
     LONG_TERM_ARTIST_BREADTH = "long_term.artist_breadth"
+    LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED = (
+        "long_term.artist_share_evolution.increased"
+    )
+    LONG_TERM_ARTIST_SHARE_EVOLUTION_DECREASED = (
+        "long_term.artist_share_evolution.decreased"
+    )
+    LONG_TERM_ARTIST_BREADTH_EVOLUTION_INCREASED = (
+        "long_term.artist_breadth_evolution.increased"
+    )
+    LONG_TERM_ARTIST_BREADTH_EVOLUTION_DECREASED = (
+        "long_term.artist_breadth_evolution.decreased"
+    )
+    LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_INCREASED = (
+        "long_term.listening_concentration_evolution.increased"
+    )
+    LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_DECREASED = (
+        "long_term.listening_concentration_evolution.decreased"
+    )

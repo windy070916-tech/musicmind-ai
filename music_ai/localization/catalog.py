@@ -8,6 +8,7 @@ from types import MappingProxyType
 from music_ai.knowledge.message_keys import FactMessageKey
 from music_ai.localization.formatters import (
     format_artist_count,
+    format_artists_per_listening_day,
     format_listening_day_count,
     format_percentage,
     format_playback_count,
@@ -370,6 +371,70 @@ _ZH_CN_FACT_TEMPLATES = MappingProxyType(
                 f"其中{_integer(data, 'single_day_artist_count')}位只出现在一天。"
             ),
         ),
+        FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_INCREASED: ChineseFactTemplate(
+            "艺人占比上升",
+            frozenset({"artist_name", "previous_value", "current_value"}),
+            lambda data: (
+                f"与前一个30天周期相比，{_text(data, 'artist_name')}"
+                "在可归因艺人听歌时长中的占比从"
+                f"{_zh_percentage(data, 'previous_value')}上升到"
+                f"{_zh_percentage(data, 'current_value')}。"
+            ),
+        ),
+        FactMessageKey.LONG_TERM_ARTIST_SHARE_EVOLUTION_DECREASED: ChineseFactTemplate(
+            "艺人占比下降",
+            frozenset({"artist_name", "previous_value", "current_value"}),
+            lambda data: (
+                f"与前一个30天周期相比，{_text(data, 'artist_name')}"
+                "在可归因艺人听歌时长中的占比从"
+                f"{_zh_percentage(data, 'previous_value')}下降到"
+                f"{_zh_percentage(data, 'current_value')}。"
+            ),
+        ),
+        FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_INCREASED: ChineseFactTemplate(
+            "艺人广度增加",
+            frozenset({"previous_value", "current_value"}),
+            lambda data: (
+                "与前一个30天周期相比，平均每个听歌日涉及的艺人数从"
+                f"{_zh_artists_per_listening_day(data, 'previous_value')}"
+                "增加到"
+                f"{_zh_artists_per_listening_day(data, 'current_value')}。"
+            ),
+        ),
+        FactMessageKey.LONG_TERM_ARTIST_BREADTH_EVOLUTION_DECREASED: ChineseFactTemplate(
+            "艺人广度减少",
+            frozenset({"previous_value", "current_value"}),
+            lambda data: (
+                "与前一个30天周期相比，平均每个听歌日涉及的艺人数从"
+                f"{_zh_artists_per_listening_day(data, 'previous_value')}"
+                "减少到"
+                f"{_zh_artists_per_listening_day(data, 'current_value')}。"
+            ),
+        ),
+        FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_INCREASED: (
+            ChineseFactTemplate(
+                "听歌集中度上升",
+                frozenset({"previous_value", "current_value"}),
+                lambda data: (
+                    "与前一个30天周期相比，排名前五的艺人在"
+                    "可归因艺人听歌时长中的占比从"
+                    f"{_zh_percentage(data, 'previous_value')}上升到"
+                    f"{_zh_percentage(data, 'current_value')}。"
+                ),
+            )
+        ),
+        FactMessageKey.LONG_TERM_LISTENING_CONCENTRATION_EVOLUTION_DECREASED: (
+            ChineseFactTemplate(
+                "听歌集中度下降",
+                frozenset({"previous_value", "current_value"}),
+                lambda data: (
+                    "与前一个30天周期相比，排名前五的艺人在"
+                    "可归因艺人听歌时长中的占比从"
+                    f"{_zh_percentage(data, 'previous_value')}下降到"
+                    f"{_zh_percentage(data, 'current_value')}。"
+                ),
+            )
+        ),
     }
 )
 
@@ -527,3 +592,11 @@ def _zh_listening_days(data: Mapping[str, object], key: str) -> str:
 
 def _zh_artists(data: Mapping[str, object], key: str) -> str:
     return format_artist_count(_integer(data, key), SupportedLocale.ZH_CN)
+
+
+def _zh_artists_per_listening_day(
+    data: Mapping[str, object], key: str
+) -> str:
+    return format_artists_per_listening_day(
+        _number(data, key), SupportedLocale.ZH_CN
+    )

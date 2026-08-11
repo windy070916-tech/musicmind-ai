@@ -1,6 +1,7 @@
 """Deterministic locale-aware formatting for MusicMind presentation."""
 
 from collections.abc import Iterable
+from decimal import Decimal, ROUND_HALF_UP, localcontext
 
 from music_ai.localization.models import SupportedLocale, require_supported_locale
 
@@ -80,6 +81,29 @@ def format_percentage(share: float, locale: SupportedLocale) -> str:
     if isinstance(share, bool) or not isinstance(share, (int, float)):
         raise TypeError("share must be numeric.")
     return f"{share:.0%}"
+
+
+def format_artists_per_listening_day(
+    value: int | float,
+    locale: SupportedLocale,
+) -> str:
+    """Format an artist-breadth ratio with deterministic decimal rounding."""
+    require_supported_locale(locale)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("artists_per_listening_day must be numeric.")
+    decimal_value = Decimal(value) if isinstance(value, int) else Decimal(str(value))
+    if not decimal_value.is_finite():
+        raise ValueError("artists_per_listening_day must be finite.")
+    if decimal_value < 0:
+        raise ValueError("artists_per_listening_day must be non-negative.")
+    digits = len(decimal_value.as_tuple().digits)
+    integer_places = max(decimal_value.as_tuple().exponent, 0)
+    with localcontext() as context:
+        context.prec = max(28, digits + integer_places + 2)
+        rounded = decimal_value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    if rounded == 0:
+        rounded = Decimal("0.0")
+    return format(rounded, ".1f")
 
 
 def join_display_names(names: Iterable[str], locale: SupportedLocale) -> str:

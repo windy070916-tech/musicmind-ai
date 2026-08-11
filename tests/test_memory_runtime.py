@@ -179,10 +179,18 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
         capture_memory,
     )
 
+    expected_recent_facts = [object()]
+    expected_long_term_state_facts = (object(),)
+    expected_long_term_evolution_facts = (object(),)
+
     def longitudinal_facts(_engine, timezone_name, _now):
         events.append("recent_analysis")
         captured.append(timezone_name)
-        return [], ()
+        return (
+            expected_recent_facts,
+            expected_long_term_state_facts,
+            expected_long_term_evolution_facts,
+        )
 
     monkeypatch.setattr(
         main,
@@ -190,13 +198,22 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
         longitudinal_facts,
     )
 
-    def output(received_profile, facts, *, recent_facts, long_term_facts, locale):
+    def output(
+        received_profile,
+        ai_facts,
+        *,
+        recent_facts: object,
+        long_term_state_facts: object,
+        long_term_evolution_facts: object,
+        locale,
+    ):
         events.append("product_output")
         assert received_profile is profile
-        assert recent_facts == []
-        assert long_term_facts == ()
+        assert recent_facts is expected_recent_facts
+        assert long_term_state_facts is expected_long_term_state_facts
+        assert long_term_evolution_facts is expected_long_term_evolution_facts
         assert locale.value == "zh-CN"
-        captured.append(tuple(facts))
+        captured.append(tuple(ai_facts))
 
     monkeypatch.setattr(main, "_print_daily_outputs", output)
 

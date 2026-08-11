@@ -114,7 +114,7 @@ or emergence does not reach both a 25% recent share and a 15 percentage-point
 increase. These are deterministic product thresholds, not calculations delegated
 to Narrative or Presentation.
 
-## Long-term Facts
+## Sprint 3C Long-term State Facts
 
 `LongTermKnowledgeEngine` consumes only completed `LongTermListeningEvidence`. It
 never reads Memory, selects the application window, or aggregates daily snapshots.
@@ -133,8 +133,51 @@ closed support, a stable `subject_key`, and a stable `concept_key`. Current and
 prefix evidence make novelty deterministic without storing display history.
 
 Descriptions state locally recorded behavior. They do not classify identity,
-personality, permanent taste, motivation, emotion, favorites, or loyalty. Recent and
-long-term facts remain outside the AI Daily Brief path in this release.
+personality, permanent taste, motivation, emotion, favorites, or loyalty.
+
+## Sprint 3E Long-term Evolution Facts
+
+`LongTermEvolutionKnowledgeEngine` consumes only completed
+`LongTermEvolutionEvidence`; it does not read Memory, choose windows, aggregate
+profiles, or import Localization. It keeps evolution separate from Sprint 3C state
+and emits qualifying concepts in this fixed order:
+
+1. `ARTIST_DURATION_SHARE_EVOLUTION`
+2. `ARTIST_BREADTH_EVOLUTION`
+3. `LISTENING_CONCENTRATION_EVOLUTION`
+
+All use `FactTimeHorizon.LONG_TERM`, `InsightType.BEHAVIOR`, and
+`FactSource.LONG_TERM_EVOLUTION_EVIDENCE`. Artist share has high importance; breadth
+and concentration have medium importance. Direction is controlled `increase` or
+`decrease`, while six direction-specific `FactMessageKey` values select the exact
+canonical English and downstream Chinese wording.
+
+Knowledge returns no evolution facts unless Previous and Current are structurally
+sufficient. Product significance uses exact pre-rounding evidence:
+
+- artist share requires at least 15 percentage points of absolute change and at
+  least 20% share in Previous or Current;
+- concentration requires at least 15 percentage points of absolute change; and
+- breadth requires at least 0.5 artists per listening day of absolute change and at
+  least 20% relative change.
+
+Zero change never qualifies. Knowledge first filters all artist candidates by both
+artist-share thresholds, then selects the greatest exact absolute change; an exact
+tie uses stable artist identity ascending. This ensures a larger unqualified
+candidate cannot block a smaller qualifying one.
+
+Evolution facts use the existing two-string `date_range`, spanning Previous start to
+Current exclusive end. Their immutable metadata contains stable `subject_key` and
+`concept_key`, direction, four window dates, raw Previous and Current values, and
+only the concept-specific numerators, denominators, and changes needed for audit and
+localization. It does not copy gaps, complete window evidence, locale, or localized
+prose. Artist and concentration values remain ratios; breadth values remain raw
+artists-per-listening-day values and canonical English displays exactly one decimal
+place using decimal round-half-up.
+
+Recent, Sprint 3C state, and Sprint 3E evolution facts all remain outside the AI
+Daily Brief. Runtime passes only daily, trend, and existing insight facts to
+`ReportGenerator`.
 
 ## Adding Future Insights
 

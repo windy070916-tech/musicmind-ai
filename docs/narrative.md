@@ -45,12 +45,36 @@ Ordinary facts remain in `highlights` and retain their deterministic importance
 ordering. Recent and long-term facts are excluded for their dedicated threads.
 
 `LongTermListeningThread` contains at most two `FactTimeHorizon.LONG_TERM`
-observations. Narrative orders artist consistency, artist breadth, then listening
-concentration before applying stable tie-breakers. After selecting the recent
-thread, it deduplicates long-term observations only when both non-empty
-`subject_key` and `concept_key` values match. The same subject may appear in both
-threads when the concepts differ. No qualifying long-term fact produces
-`long_term_thread=None`.
+observations. Sprint 3C state facts and Sprint 3E evolution facts remain separate in
+runtime and join only in Narrative's fact-sequence input. Narrative processes them
+in this order:
+
+1. Select `Recently` with the existing behavior.
+2. Remove explicit Recent/long-term semantic duplicates.
+3. Suppress matching Sprint 3C state facts.
+4. Apply explicit long-term category priority and stable tie-breakers.
+5. Retain at most two `Over Time` observations.
+
+The long-term category priority is artist-share evolution, artist-breadth evolution,
+listening-concentration evolution, artist consistency, artist breadth, listening
+concentration, then other long-term categories. Ties resolve by importance
+descending, stable category value, `subject_key`, `concept_key`, canonical title,
+and canonical description. Input order, enum declaration order, and Presentation do
+not affect the result.
+
+Before the two-item limit, breadth evolution suppresses breadth state only when both
+facts have the same valid all-artists subject and breadth concept. Concentration
+evolution applies the equivalent matching-concept rule. Artist-share evolution does
+not suppress artist consistency. Missing semantic identity causes conservative
+retention.
+
+Existing exact cross-horizon and same-horizon deduplication by equal, non-empty
+`subject_key` plus `concept_key` remains. Sprint 3E adds one explicit cross-concept
+relationship: selected Recent `ARTIST_EMERGENCE` suppresses long-term
+`ARTIST_DURATION_SHARE_EVOLUTION` only for the same valid subject when evolution
+direction is `increase`; concept-key equality is not required. Share decreases,
+different artists, unrelated concepts, missing identity, and missing or invalid
+direction remain. No qualifying long-term fact produces `long_term_thread=None`.
 
 MusicMind now renders this contract as the deterministic `MusicMind Daily` before
 calling the separate AI report path. The renderer formats only the existing profile

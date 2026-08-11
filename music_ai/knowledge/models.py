@@ -28,6 +28,9 @@ class FactCategory(StrEnum):
     ARTIST_CONSISTENCY = "artist_consistency"
     LISTENING_CONCENTRATION = "listening_concentration"
     ARTIST_BREADTH = "artist_breadth"
+    ARTIST_DURATION_SHARE_EVOLUTION = "artist_duration_share_evolution"
+    ARTIST_BREADTH_EVOLUTION = "artist_breadth_evolution"
+    LISTENING_CONCENTRATION_EVOLUTION = "listening_concentration_evolution"
 
 
 class InsightType(StrEnum):
@@ -53,6 +56,7 @@ class FactSource(StrEnum):
     LISTENING_SUMMARY_COMPARISON = "listening_summary_comparison"
     RECENT_LISTENING_EVIDENCE = "recent_listening_evidence"
     LONG_TERM_LISTENING_EVIDENCE = "long_term_listening_evidence"
+    LONG_TERM_EVOLUTION_EVIDENCE = "long_term_evolution_evidence"
 
 
 class FactTimeHorizon(StrEnum):

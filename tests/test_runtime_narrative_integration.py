@@ -131,10 +131,11 @@ def test_recent_facts_render_but_do_not_change_existing_ai_input(
     assert "## Recently" in events[0][1]
     assert recent_fact.description in events[0][1]
     assert events[1] == ("generate_ai", daily_facts)
+    assert events[1][1] is daily_facts
     assert events[2] == ("ai", "AI report")
 
 
-def test_long_term_facts_render_but_do_not_change_existing_ai_input(
+def test_long_term_state_facts_render_but_do_not_change_existing_ai_input(
     monkeypatch,
 ) -> None:
     events: list[object] = []
@@ -172,12 +173,66 @@ def test_long_term_facts_render_but_do_not_change_existing_ai_input(
         _profile(),
         daily_facts,
         lambda _locale: FakeReportGenerator(),
-        long_term_facts=(long_term_fact,),
+        long_term_state_facts=(long_term_fact,),
     )
 
     assert "## Over Time" in events[0][1]
     assert long_term_fact.description in events[0][1]
     assert events[1] == ("generate_ai", daily_facts)
+    assert events[1][1] is daily_facts
+    assert events[2] == ("ai", "AI report")
+
+
+def test_long_term_evolution_facts_render_but_do_not_change_ai_input(
+    monkeypatch,
+) -> None:
+    events: list[object] = []
+    ai_facts = [_fact()]
+    evolution_fact = KnowledgeFact(
+        category=FactCategory.ARTIST_DURATION_SHARE_EVOLUTION,
+        importance=ImportanceLevel.HIGH,
+        title="Artist share increased",
+        description=(
+            "The share of attributable artist listening for Artist One increased "
+            "from 20% in the previous 30-day period to 40% in the current "
+            "30-day period."
+        ),
+        metadata={
+            "subject_key": "spotify:artist-one",
+            "concept_key": "artist_duration_share",
+            "direction": "increase",
+        },
+        insight_type=InsightType.BEHAVIOR,
+        time_horizon=FactTimeHorizon.LONG_TERM,
+    )
+
+    class FakeReportGenerator:
+        def generate_daily_report(self, received_facts):
+            events.append(("generate_ai", received_facts))
+            return "AI report"
+
+    monkeypatch.setattr(
+        main,
+        "_print_daily_narrative",
+        lambda report: events.append(("daily", report)),
+    )
+    monkeypatch.setattr(
+        main,
+        "_print_ai_report",
+        lambda report, *, locale: events.append(("ai", report)),
+    )
+
+    main._print_daily_outputs(
+        _profile(),
+        ai_facts,
+        lambda _locale: FakeReportGenerator(),
+        long_term_evolution_facts=(evolution_fact,),
+    )
+
+    assert "## Over Time" in events[0][1]
+    assert evolution_fact.description in events[0][1]
+    assert events[1] == ("generate_ai", ai_facts)
+    assert events[1][1] is ai_facts
     assert events[2] == ("ai", "AI report")
 
 
@@ -208,32 +263,112 @@ def test_runtime_supplies_explicit_recent_and_comparison_windows() -> None:
     assert facts == []
 
 
-def test_runtime_loads_one_range_and_supplies_explicit_long_term_window() -> None:
+def test_runtime_reuses_one_range_for_exact_longitudinal_windows(monkeypatch) -> None:
     calls: list[tuple[date, date]] = []
-    as_of = datetime(2026, 7, 24, 8, tzinfo=timezone.utc)
+    analyzer_calls: dict[str, tuple[ListeningMemory, dict[str, object]]] = {}
+    as_of = datetime(2026, 8, 6, 8, tzinfo=timezone.utc)
+    memory = ListeningMemory(
+        start_date=date(2026, 6, 7),
+        end_date=date(2026, 8, 7),
+        timezone_name="Asia/Shanghai",
+        snapshots=(),
+        as_of=as_of,
+    )
 
     class FakeMemoryEngine:
         def load_range(
             self, start_date: date, end_date: date
         ) -> ListeningMemory:
             calls.append((start_date, end_date))
-            return ListeningMemory(
-                start_date=start_date,
-                end_date=end_date,
-                timezone_name="Asia/Shanghai",
-                snapshots=(),
-                as_of=as_of,
-            )
+            return memory
 
-    recent, long_term = main._longitudinal_listening_facts(
+    recent_evidence = object()
+    state_evidence = object()
+    evolution_evidence = object()
+
+    class FakeRecentAnalytics:
+        def analyze(self, received_memory, **kwargs):
+            analyzer_calls["recent"] = (received_memory, kwargs)
+            return recent_evidence
+
+    class FakeStateAnalytics:
+        def analyze(self, received_memory, **kwargs):
+            analyzer_calls["state"] = (received_memory, kwargs)
+            return state_evidence
+
+    class FakeEvolutionAnalytics:
+        def analyze(self, received_memory, **kwargs):
+            analyzer_calls["evolution"] = (received_memory, kwargs)
+            return evolution_evidence
+
+    recent_facts = [_fact()]
+    state_facts = (_fact(),)
+    evolution_facts = (_fact(),)
+    facts_by_evidence = {
+        recent_evidence: recent_facts,
+        state_evidence: state_facts,
+        evolution_evidence: evolution_facts,
+    }
+
+    class FakeKnowledgeEngine:
+        def __init__(self, evidence):
+            self._facts = facts_by_evidence[evidence]
+
+        def generate_facts(self):
+            return self._facts
+
+    monkeypatch.setattr(main, "TemporalListeningAnalytics", FakeRecentAnalytics)
+    monkeypatch.setattr(main, "LongTermListeningAnalytics", FakeStateAnalytics)
+    monkeypatch.setattr(main, "LongTermEvolutionAnalytics", FakeEvolutionAnalytics)
+    monkeypatch.setattr(main, "RecentKnowledgeEngine", FakeKnowledgeEngine)
+    monkeypatch.setattr(main, "LongTermKnowledgeEngine", FakeKnowledgeEngine)
+    monkeypatch.setattr(main, "LongTermEvolutionKnowledgeEngine", FakeKnowledgeEngine)
+
+    recent, state, evolution = main._longitudinal_listening_facts(
         FakeMemoryEngine(),  # type: ignore[arg-type]
         "Asia/Shanghai",
         as_of,
     )
 
-    assert calls == [(date(2026, 6, 24), date(2026, 7, 25))]
-    assert recent == []
-    assert long_term == ()
+    assert calls == [(date(2026, 6, 7), date(2026, 8, 7))]
+    assert all(
+        received_memory is memory
+        for received_memory, _kwargs in analyzer_calls.values()
+    )
+    assert analyzer_calls["recent"] == (
+        memory,
+        {
+            "recent_start_date": date(2026, 7, 31),
+            "recent_end_date": date(2026, 8, 7),
+            "comparison_start_date": date(2026, 7, 24),
+            "comparison_end_date": date(2026, 7, 31),
+            "timezone_name": "Asia/Shanghai",
+            "as_of": as_of,
+        },
+    )
+    assert analyzer_calls["state"] == (
+        memory,
+        {
+            "start_date": date(2026, 7, 7),
+            "end_date": date(2026, 8, 6),
+            "timezone_name": "Asia/Shanghai",
+            "as_of": as_of,
+        },
+    )
+    assert analyzer_calls["evolution"] == (
+        memory,
+        {
+            "previous_start_date": date(2026, 6, 7),
+            "previous_end_date": date(2026, 7, 7),
+            "current_start_date": date(2026, 7, 7),
+            "current_end_date": date(2026, 8, 6),
+            "timezone_name": "Asia/Shanghai",
+            "as_of": as_of,
+        },
+    )
+    assert recent is recent_facts
+    assert state is state_facts
+    assert evolution is evolution_facts
 
 
 def test_daily_summary_and_profile_share_exact_current_boundaries(monkeypatch) -> None:
