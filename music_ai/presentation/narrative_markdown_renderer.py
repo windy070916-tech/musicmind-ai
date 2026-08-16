@@ -1,13 +1,10 @@
 """Markdown presentation for MusicMind's deterministic daily narrative."""
 
-from collections.abc import Iterable
-
 from music_ai.analytics.listening_profile import (
     RankedArtist,
     RankedGenre,
     RankedTrack,
 )
-from music_ai.knowledge.models import FactCategory, InsightType, KnowledgeFact
 from music_ai.localization.catalog import ui_text
 from music_ai.localization.fact_localizer import localize_fact
 from music_ai.localization.formatters import (
@@ -19,14 +16,11 @@ from music_ai.localization.formatters import (
 )
 from music_ai.localization.models import SupportedLocale, UiMessageKey
 from music_ai.narrative.models import DailyNarrative
-
-
-_BASIC_DAILY_CATEGORIES = {
-    FactCategory.LISTENING_TIME,
-    FactCategory.PLAYBACK_COUNT,
-    FactCategory.TOP_ARTIST,
-    FactCategory.TOP_SONG,
-}
+from music_ai.visible_content import (
+    VisibleProfileState,
+    VisibleReportComposition,
+    compose_visible_report,
+)
 
 
 def render_daily_narrative(
@@ -34,21 +28,28 @@ def render_daily_narrative(
     *,
     locale: SupportedLocale = SupportedLocale.EN_US,
 ) -> str:
-    """Render one immutable Narrative contract as deterministic Markdown."""
-    sections = [f"# {ui_text(locale, UiMessageKey.DAILY_REPORT_TITLE)}"]
-    subtitle = _subtitle(narrative.headline)
-    if subtitle is not None:
-        sections.append(subtitle)
+    """Compose and render one immutable Narrative contract."""
+    return render_visible_report(compose_visible_report(narrative), locale=locale)
 
-    profile = narrative.listening_profile
-    if profile is None:
+
+def render_visible_report(
+    composition: VisibleReportComposition,
+    *,
+    locale: SupportedLocale = SupportedLocale.EN_US,
+) -> str:
+    """Render the exact locale-neutral selection used by the visible manifest."""
+    sections = [f"# {ui_text(locale, UiMessageKey.DAILY_REPORT_TITLE)}"]
+    if composition.subtitle is not None:
+        sections.append(composition.subtitle)
+
+    if composition.profile_state is VisibleProfileState.UNAVAILABLE:
         sections.extend(
             (
                 f"## {ui_text(locale, UiMessageKey.LISTENING_OVERVIEW)}",
                 ui_text(locale, UiMessageKey.LISTENING_UNAVAILABLE),
             )
         )
-    elif profile.playback_count == 0:
+    elif composition.profile_state is VisibleProfileState.NO_ACTIVITY:
         sections.extend(
             (
                 f"## {ui_text(locale, UiMessageKey.LISTENING_OVERVIEW)}",
@@ -56,6 +57,9 @@ def render_daily_narrative(
             )
         )
     else:
+        profile = composition.profile_summary
+        if profile is None:  # Protected by VisibleReportComposition validation.
+            raise ValueError("Active visible report composition requires a summary.")
         sections.extend(
             (
                 f"## {ui_text(locale, UiMessageKey.LISTENING_OVERVIEW)}",
@@ -87,7 +91,7 @@ def render_daily_narrative(
             )
         )
 
-        artists = profile.top_artists[:3]
+        artists = composition.top_artists
         if artists:
             sections.extend(
                 (
@@ -99,7 +103,7 @@ def render_daily_narrative(
                 )
             )
 
-        tracks = profile.top_tracks[:5]
+        tracks = composition.top_tracks
         if tracks:
             sections.extend(
                 (
@@ -111,7 +115,7 @@ def render_daily_narrative(
                 )
             )
 
-        genres = profile.top_genres[:3]
+        genres = composition.top_genres
         if genres:
             sections.extend(
                 (
@@ -123,59 +127,40 @@ def render_daily_narrative(
                 )
             )
 
-    if narrative.recent_thread is not None:
+    if composition.recent_observations:
         sections.extend(
             (
                 f"## {ui_text(locale, UiMessageKey.RECENTLY)}",
                 "\n".join(
                     f"- {localize_fact(fact, locale).description}"
-                    for fact in narrative.recent_thread.observations
+                    for fact in composition.recent_observations
                 ),
             )
         )
 
-    if narrative.long_term_thread is not None:
+    if composition.long_term_observations:
         sections.extend(
             (
                 f"## {ui_text(locale, UiMessageKey.OVER_TIME)}",
                 "\n".join(
                     f"- {localize_fact(fact, locale).description}"
-                    for fact in narrative.long_term_thread.observations
+                    for fact in composition.long_term_observations
                 ),
             )
         )
 
-    highlights = tuple(_eligible_highlights(narrative.highlights))[:3]
-    if highlights:
+    if composition.highlights:
         sections.extend(
             (
                 f"## {ui_text(locale, UiMessageKey.HIGHLIGHTS)}",
                 "\n".join(
                     f"- {localize_fact(fact, locale).description}"
-                    for fact in highlights
+                    for fact in composition.highlights
                 ),
             )
         )
 
     return "\n\n".join(sections)
-
-
-def _eligible_highlights(facts: Iterable[KnowledgeFact]) -> Iterable[KnowledgeFact]:
-    """Yield already-selected facts that do not duplicate deterministic sections."""
-    for fact in facts:
-        if fact.insight_type == InsightType.DAILY_LISTENING:
-            continue
-        if fact.category in _BASIC_DAILY_CATEGORIES:
-            continue
-        yield fact
-
-
-def _subtitle(headline: str) -> str | None:
-    """Return meaningful nonduplicate Narrative headline text."""
-    normalized = headline.strip()
-    if not normalized or normalized.casefold() in {"daily listening", "musicmind daily"}:
-        return None
-    return normalized
 
 
 def _display_artist_name(artist: RankedArtist, locale: SupportedLocale) -> str:

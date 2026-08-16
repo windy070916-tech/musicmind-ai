@@ -175,9 +175,12 @@ prose. Artist and concentration values remain ratios; breadth values remain raw
 artists-per-listening-day values and canonical English displays exactly one decimal
 place using decimal round-half-up.
 
-Recent, Sprint 3C state, and Sprint 3E evolution facts all remain outside the AI
-Daily Brief. Runtime passes only daily, trend, and existing insight facts to
-`ReportGenerator`.
+Qualified explicitly closed historical Daily, interpretation-only closed Recent,
+Sprint 3C state, Sprint 3E evolution, and Sprint 4A contextual facts may feed Signal
+Projection. The provider never receives that full
+fact collection: it receives only the deliberate typed projection of Signals chosen
+by the deterministic Planner. Contextual interpretation-support facts are not
+automatically added to the visible deterministic Narrative.
 
 ## Adding Future Insights
 
@@ -189,7 +192,8 @@ Future insight work should follow the existing pattern:
 - For longitudinal work, first add deterministic evidence to Temporal Analytics and
   let a Knowledge engine consume that evidence without reading Memory.
 - Store machine-readable values in `metadata`.
-- Keep presentation formatting and LLM prompting outside the Knowledge layer.
+- Keep Signal composition, planning, presentation formatting, and LLM prompting
+  outside the Knowledge layer.
 - Add deterministic unit tests for the new fact behavior.
 
 If a future insight needs a new single-period statistic, add it to Analytics first.

@@ -63,7 +63,13 @@ _EN_US_UI_CATALOG = MappingProxyType(
         UiMessageKey.INSIGHT_FACTS_LABEL: "MusicMind Insight Facts",
         UiMessageKey.NO_DAILY_CHANGES: "No changes from yesterday.",
         UiMessageKey.NO_DAILY_INSIGHTS: "No behavioral insights for today.",
-        UiMessageKey.AI_REPORT_LABEL: "MusicMind AI Report",
+        UiMessageKey.AI_REPORT_LABEL: "MusicMind AI",
+        UiMessageKey.AI_NO_SIGNAL: (
+            "There are no new listening changes worth a separate interpretation today."
+        ),
+        UiMessageKey.AI_GENERATION_FAILURE: (
+            "MusicMind AI could not generate an interpretation this time."
+        ),
         UiMessageKey.OAUTH_OPEN_URL: "Open this URL in your browser to authenticate with Spotify:",
         UiMessageKey.OAUTH_UNKNOWN_CALLBACK_PATH: "Unknown callback path.",
         UiMessageKey.OAUTH_AUTHORIZATION_FAILED: "Spotify authorization failed: {error}",
@@ -72,13 +78,6 @@ _EN_US_UI_CATALOG = MappingProxyType(
         UiMessageKey.OAUTH_SUCCESS: (
             "Spotify authentication received. You can return to the terminal."
         ),
-        UiMessageKey.AI_REPORT_TITLE: "MusicMind Daily Brief",
-        UiMessageKey.AI_GREETING: "Greeting",
-        UiMessageKey.AI_LISTENING_SUMMARY: "Listening Summary",
-        UiMessageKey.AI_TREND: "Trend",
-        UiMessageKey.AI_INSIGHT: "Insight",
-        UiMessageKey.AI_RECOMMENDATION: "Recommendation",
-        UiMessageKey.AI_CLOSING: "Closing",
         UiMessageKey.CLI_LOCALE_HELP: "Report language: zh-CN or en-US",
     }
 )
@@ -115,20 +114,15 @@ _ZH_CN_UI_CATALOG = MappingProxyType(
         UiMessageKey.INSIGHT_FACTS_LABEL: "MusicMind 重点发现",
         UiMessageKey.NO_DAILY_CHANGES: "与昨天相比没有变化。",
         UiMessageKey.NO_DAILY_INSIGHTS: "今天暂无听歌行为方面的重点发现。",
-        UiMessageKey.AI_REPORT_LABEL: "MusicMind AI 报告",
+        UiMessageKey.AI_REPORT_LABEL: "MusicMind AI",
+        UiMessageKey.AI_NO_SIGNAL: "今天还没有出现值得单独解读的新变化。",
+        UiMessageKey.AI_GENERATION_FAILURE: "MusicMind AI 本次未能生成解读。",
         UiMessageKey.OAUTH_OPEN_URL: "请在浏览器中打开以下网址以登录 Spotify：",
         UiMessageKey.OAUTH_UNKNOWN_CALLBACK_PATH: "未知的回调路径。",
         UiMessageKey.OAUTH_AUTHORIZATION_FAILED: "Spotify 授权失败：{error}",
         UiMessageKey.OAUTH_INVALID_STATE: "授权状态无效。",
         UiMessageKey.OAUTH_MISSING_CODE: "缺少授权代码。",
         UiMessageKey.OAUTH_SUCCESS: "Spotify 登录已完成。你可以返回终端。",
-        UiMessageKey.AI_REPORT_TITLE: "MusicMind AI 每日报告",
-        UiMessageKey.AI_GREETING: "问候",
-        UiMessageKey.AI_LISTENING_SUMMARY: "听歌概览",
-        UiMessageKey.AI_TREND: "最近趋势",
-        UiMessageKey.AI_INSIGHT: "重点发现",
-        UiMessageKey.AI_RECOMMENDATION: "温和建议",
-        UiMessageKey.AI_CLOSING: "结束语",
         UiMessageKey.CLI_LOCALE_HELP: "报告语言：zh-CN 或 en-US",
     }
 )
@@ -174,19 +168,14 @@ _UI_PLACEHOLDER_CONTRACT = MappingProxyType(
         UiMessageKey.NO_DAILY_CHANGES: frozenset(),
         UiMessageKey.NO_DAILY_INSIGHTS: frozenset(),
         UiMessageKey.AI_REPORT_LABEL: frozenset(),
+        UiMessageKey.AI_NO_SIGNAL: frozenset(),
+        UiMessageKey.AI_GENERATION_FAILURE: frozenset(),
         UiMessageKey.OAUTH_OPEN_URL: frozenset(),
         UiMessageKey.OAUTH_UNKNOWN_CALLBACK_PATH: frozenset(),
         UiMessageKey.OAUTH_AUTHORIZATION_FAILED: frozenset({"error"}),
         UiMessageKey.OAUTH_INVALID_STATE: frozenset(),
         UiMessageKey.OAUTH_MISSING_CODE: frozenset(),
         UiMessageKey.OAUTH_SUCCESS: frozenset(),
-        UiMessageKey.AI_REPORT_TITLE: frozenset(),
-        UiMessageKey.AI_GREETING: frozenset(),
-        UiMessageKey.AI_LISTENING_SUMMARY: frozenset(),
-        UiMessageKey.AI_TREND: frozenset(),
-        UiMessageKey.AI_INSIGHT: frozenset(),
-        UiMessageKey.AI_RECOMMENDATION: frozenset(),
-        UiMessageKey.AI_CLOSING: frozenset(),
         UiMessageKey.CLI_LOCALE_HELP: frozenset(),
     }
 )

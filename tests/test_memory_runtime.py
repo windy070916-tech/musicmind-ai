@@ -93,6 +93,7 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
     monkeypatch,
 ) -> None:
     events = []
+    run_times = []
     empty_summary = ListeningSummary(0, 0, (), ())
     profile = _profile()
 
@@ -163,14 +164,16 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
         assert timezone_name == "Asia/Shanghai"
         assert now.tzinfo is not None
         events.append("daily_analytics")
+        run_times.append(now)
         return empty_summary, empty_summary, profile
 
     captured = []
     monkeypatch.setattr(main, "_daily_listening_summaries", summaries)
 
-    def capture_memory(_database, timezone_name, _now):
+    def capture_memory(_database, timezone_name, now):
         events.append("memory_captured")
         captured.append(timezone_name)
+        run_times.append(now)
         return object()
 
     monkeypatch.setattr(
@@ -180,16 +183,20 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
     )
 
     expected_recent_facts = [object()]
+    expected_closed_recent_signal_facts = [object()]
     expected_long_term_state_facts = (object(),)
     expected_long_term_evolution_facts = (object(),)
 
-    def longitudinal_facts(_engine, timezone_name, _now):
+    def longitudinal_facts(_engine, timezone_name, now):
         events.append("recent_analysis")
         captured.append(timezone_name)
+        run_times.append(now)
         return (
             expected_recent_facts,
+            expected_closed_recent_signal_facts,
             expected_long_term_state_facts,
             expected_long_term_evolution_facts,
+            None,
         )
 
     monkeypatch.setattr(
@@ -197,23 +204,38 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
         "_longitudinal_listening_facts",
         longitudinal_facts,
     )
+    expected_contextual_facts = (object(),)
+
+    def contextual_facts(_database, timezone_name, now):
+        events.append("contextual_analysis")
+        captured.append(timezone_name)
+        run_times.append(now)
+        return expected_contextual_facts
+
+    monkeypatch.setattr(main, "_contextual_listening_facts", contextual_facts)
 
     def output(
         received_profile,
-        ai_facts,
+        daily_knowledge_facts,
         *,
         recent_facts: object,
+        closed_recent_signal_facts: object,
         long_term_state_facts: object,
         long_term_evolution_facts: object,
+        contextual_facts: object,
+        interpretation_failure: object,
         locale,
     ):
         events.append("product_output")
         assert received_profile is profile
         assert recent_facts is expected_recent_facts
+        assert closed_recent_signal_facts is expected_closed_recent_signal_facts
         assert long_term_state_facts is expected_long_term_state_facts
         assert long_term_evolution_facts is expected_long_term_evolution_facts
+        assert contextual_facts is expected_contextual_facts
+        assert interpretation_failure is None
         assert locale.value == "zh-CN"
-        captured.append(tuple(ai_facts))
+        captured.append(tuple(daily_knowledge_facts))
 
     monkeypatch.setattr(main, "_print_daily_outputs", output)
 
@@ -224,11 +246,16 @@ def test_main_captures_memory_after_raw_persistence_without_changing_facts(
     assert events.index("raw_playback_saved") < events.index("memory_captured")
     assert events.index("daily_analytics") < events.index("memory_captured")
     assert events.index("memory_captured") < events.index("recent_analysis")
+    assert events.index("recent_analysis") < events.index("contextual_analysis")
+    assert events.index("contextual_analysis") < events.index("product_output")
     assert events.index("memory_captured") < events.index("product_output")
     assert events.count("memory_captured") == 1
+    assert len(run_times) == 4
+    assert all(value is run_times[0] for value in run_times)
     assert captured[0] == "Asia/Shanghai"
     assert captured[1] == "Asia/Shanghai"
-    assert [fact.category for fact in captured[2]] == [
+    assert captured[2] == "Asia/Shanghai"
+    assert [fact.category for fact in captured[3]] == [
         "listening_time",
         "playback_count",
     ]

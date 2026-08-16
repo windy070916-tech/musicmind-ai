@@ -44,8 +44,31 @@ def test_download_runtime_messages_follow_resolved_locale(capsys) -> None:
 def test_ai_report_runtime_label_is_localized(capsys) -> None:
     main._print_ai_report("报告正文", locale=SupportedLocale.ZH_CN)
     output = capsys.readouterr().out
-    assert "MusicMind AI 报告" in output
+    assert "MusicMind AI" in output
     assert "报告正文" in output
+
+
+def test_ai_no_signal_and_generation_failure_are_distinct_localized_states() -> None:
+    from music_ai.localization.catalog import ui_text
+    from music_ai.localization.models import UiMessageKey
+
+    expected = {
+        SupportedLocale.EN_US: (
+            "There are no new listening changes worth a separate interpretation today."
+        ),
+        SupportedLocale.ZH_CN: "今天还没有出现值得单独解读的新变化。",
+    }
+    prohibited = {
+        SupportedLocale.EN_US: ("signal", "qualified", "threshold", "eligible"),
+        SupportedLocale.ZH_CN: ("信号", "呈现条件", "达到"),
+    }
+    for locale in SupportedLocale:
+        no_signal = ui_text(locale, UiMessageKey.AI_NO_SIGNAL)
+        failure = ui_text(locale, UiMessageKey.AI_GENERATION_FAILURE)
+        assert no_signal == expected[locale]
+        assert failure
+        assert no_signal != failure
+        assert all(term not in no_signal.lower() for term in prohibited[locale])
 
 
 def test_spotify_auth_receives_prelocalized_copy_without_resolving_locale(

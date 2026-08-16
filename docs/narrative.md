@@ -76,12 +76,12 @@ direction is `increase`; concept-key equality is not required. Share decreases,
 different artists, unrelated concepts, missing identity, and missing or invalid
 direction remain. No qualifying long-term fact produces `long_term_thread=None`.
 
-MusicMind now renders this contract as the deterministic `MusicMind Daily` before
-calling the separate AI report path. The renderer formats only the existing profile
-and selected fact descriptions. When a thread exists, Presentation prints a
-`Recently` section in the order supplied by Narrative. The optional `Over Time`
-section follows it and also preserves Narrative order. Presentation does not filter,
-rank, or deduplicate either collection.
+After Narrative, one locale-neutral visible-report composition applies final display
+limits and produces both the deterministic `MusicMind Daily` content and its
+semantic Visible Content Manifest. When a thread exists, Presentation prints a
+`Recently` section in Narrative order. The optional `Over Time` section follows and
+also preserves Narrative order. Presentation does not rank Signals or determine AI
+relationships.
 
 Narrative remains locale-neutral. It continues sorting and selecting canonical
 `KnowledgeFact` values, including its existing title/description tie-breakers. The
@@ -91,7 +91,9 @@ localizes selected fact descriptions at render time. Consequently `zh-CN` and
 Locale is not stored in `DailyNarrative`, either thread contract, or Narrative
 metadata.
 
-The AI Daily Brief remains an independent optional interpretation path. Its legacy
-Knowledge facts are based on `ListeningSummary`, while profile artist rankings use
-primary-artist attribution, so the two outputs may temporarily differ for
-collaborative tracks.
+The separate AI interpretation path projects qualified Knowledge evidence into
+Signals, then uses the deterministic Planner and Visible Content Manifest to suppress
+pure within-run restatement. Narrative does not import Signal or Planner policy and
+does not assign Primary, Secondary, or Watch roles. Its visible Recent observations
+remain the existing open-inclusive selection; the separate closed Recent facts used
+for Signal qualification never enter Narrative.

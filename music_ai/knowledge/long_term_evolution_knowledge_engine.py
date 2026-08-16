@@ -326,6 +326,10 @@ def _common_metadata(
         "previous_end_date": context.previous_window.end_date.isoformat(),
         "current_start_date": context.current_window.start_date.isoformat(),
         "current_end_date": context.current_window.end_date.isoformat(),
+        "contains_open_snapshot": (
+            context.previous_window.contains_open_snapshot
+            or context.current_window.contains_open_snapshot
+        ),
         "previous_value": previous_value,
         "current_value": current_value,
     }

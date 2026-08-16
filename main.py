@@ -6,11 +6,13 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from config import load_environment, load_musicmind_timezone, load_spotify_settings
-from music_ai.ai.report_generator import ReportGenerator
+from music_ai.ai import InterpretationRequest, ReportGenerator
+from music_ai.analytics.contextual_analytics import ContextualListeningAnalytics
 from music_ai.analytics.listening_analytics import ListeningAnalytics, ListeningSummary
 from music_ai.analytics.listening_profile import DailyListeningProfile
 from music_ai.database.database import Database
 from music_ai.knowledge.knowledge_engine import KnowledgeEngine
+from music_ai.knowledge.contextual_knowledge_engine import ContextualKnowledgeEngine
 from music_ai.knowledge.long_term_evolution_knowledge_engine import (
     LongTermEvolutionKnowledgeEngine,
 )
@@ -41,12 +43,15 @@ from music_ai.repository.listening_memory_repository import (
 from music_ai.repository.play_history_repository import PlayHistoryRepository
 from music_ai.repository.song_repository import SongRepository
 from music_ai.repository.song_artist_repository import SongArtistRepository
-from music_ai.presentation.narrative_markdown_renderer import render_daily_narrative
+from music_ai.planning import InterpretationPlanner
+from music_ai.presentation.narrative_markdown_renderer import render_visible_report
+from music_ai.signal import SignalProjector
 from music_ai.spotify.auth import OAuthUserMessages, SpotifyAuth
 from music_ai.spotify.client import SpotifyClient
 from music_ai.temporal.analytics import TemporalListeningAnalytics
 from music_ai.temporal.long_term_evolution_analytics import LongTermEvolutionAnalytics
 from music_ai.temporal.long_term_analytics import LongTermListeningAnalytics
+from music_ai.visible_content import compose_visible_report
 
 
 _RECENT_WINDOW_DAYS = 7
@@ -113,24 +118,40 @@ def main(argv: Sequence[str] = ()) -> int:
     )
     (
         recent_facts,
+        closed_recent_signal_facts,
         long_term_state_facts,
         long_term_evolution_facts,
+        interpretation_failure,
     ) = _longitudinal_listening_facts(
         memory_engine,
         timezone_name,
         analytics_time,
     )
+    try:
+        contextual_facts = _contextual_listening_facts(
+            database,
+            timezone_name,
+            analytics_time,
+        )
+    except Exception as error:
+        # Contextual evidence serves only the interpretation path. Its failure must
+        # not suppress the deterministic daily report.
+        contextual_facts = ()
+        interpretation_failure = interpretation_failure or error
     knowledge_engine = KnowledgeEngine(current_summary, previous_summary)
     daily_facts = knowledge_engine.generate_daily_facts()
     trend_facts = knowledge_engine.generate_trend_facts()
     insight_facts = knowledge_engine.generate_insight_facts()
-    ai_facts = daily_facts + trend_facts + insight_facts
+    daily_knowledge_facts = daily_facts + trend_facts + insight_facts
     _print_daily_outputs(
         current_profile,
-        ai_facts,
+        daily_knowledge_facts,
         recent_facts=recent_facts,
+        closed_recent_signal_facts=closed_recent_signal_facts,
         long_term_state_facts=long_term_state_facts,
         long_term_evolution_facts=long_term_evolution_facts,
+        contextual_facts=contextual_facts,
+        interpretation_failure=interpretation_failure,
         locale=locale,
     )
     return 0
@@ -221,10 +242,12 @@ def _longitudinal_listening_facts(
     as_of: datetime,
 ) -> tuple[
     list[KnowledgeFact],
+    list[KnowledgeFact],
     tuple[KnowledgeFact, ...],
     tuple[KnowledgeFact, ...],
+    Exception | None,
 ]:
-    """Build recent, state, and evolution facts from one bounded Memory read."""
+    """Build visible and signal-safe longitudinal facts from one Memory read."""
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("Longitudinal analysis time must be timezone-aware.")
     local_date = as_of.astimezone(ZoneInfo(timezone_name)).date()
@@ -233,6 +256,14 @@ def _longitudinal_listening_facts(
     recent_start_date = recent_end_date - timedelta(days=_RECENT_WINDOW_DAYS)
     comparison_end_date = recent_start_date
     comparison_start_date = comparison_end_date - timedelta(
+        days=_COMPARISON_WINDOW_DAYS
+    )
+    closed_recent_end_date = local_date
+    closed_recent_start_date = closed_recent_end_date - timedelta(
+        days=_RECENT_WINDOW_DAYS
+    )
+    closed_comparison_end_date = closed_recent_start_date
+    closed_comparison_start_date = closed_comparison_end_date - timedelta(
         days=_COMPARISON_WINDOW_DAYS
     )
     long_term_end_date = local_date
@@ -257,6 +288,25 @@ def _longitudinal_listening_facts(
         timezone_name=timezone_name,
         as_of=as_of,
     )
+    closed_recent_failure: Exception | None = None
+    try:
+        closed_recent_evidence = TemporalListeningAnalytics().analyze(
+            memory,
+            recent_start_date=closed_recent_start_date,
+            recent_end_date=closed_recent_end_date,
+            comparison_start_date=closed_comparison_start_date,
+            comparison_end_date=closed_comparison_end_date,
+            timezone_name=timezone_name,
+            as_of=as_of,
+        )
+        closed_recent_signal_facts = RecentKnowledgeEngine(
+            closed_recent_evidence
+        ).generate_facts()
+    except Exception as error:
+        # This closed-window pass exists only for interpretation qualification.
+        # Its failure must not suppress the visible deterministic report.
+        closed_recent_signal_facts = []
+        closed_recent_failure = error
     long_term_evidence = LongTermListeningAnalytics().analyze(
         memory,
         start_date=long_term_start_date,
@@ -275,10 +325,12 @@ def _longitudinal_listening_facts(
     )
     return (
         RecentKnowledgeEngine(recent_evidence).generate_facts(),
+        closed_recent_signal_facts,
         LongTermKnowledgeEngine(long_term_evidence).generate_facts(),
         LongTermEvolutionKnowledgeEngine(
             long_term_evolution_evidence
         ).generate_facts(),
+        closed_recent_failure,
     )
 
 
@@ -315,36 +367,88 @@ def _recent_listening_facts(
     return RecentKnowledgeEngine(evidence).generate_facts()
 
 
+def _contextual_listening_facts(
+    database: Database,
+    timezone_name: str,
+    as_of: datetime,
+) -> tuple[KnowledgeFact, ...]:
+    """Qualify raw-event context using the same run timezone and instant."""
+    evidence = ContextualListeningAnalytics(database).analyze(
+        timezone_name=timezone_name,
+        as_of=as_of,
+    )
+    return ContextualKnowledgeEngine(evidence).generate_facts()
+
+
 def _print_daily_outputs(
     listening_profile: DailyListeningProfile,
-    ai_facts: list[KnowledgeFact],
+    daily_knowledge_facts: Sequence[KnowledgeFact],
     report_generator_factory: Callable[[SupportedLocale], ReportGenerator] | None = None,
     *,
     recent_facts: Sequence[KnowledgeFact] = (),
+    closed_recent_signal_facts: Sequence[KnowledgeFact] = (),
     long_term_state_facts: Sequence[KnowledgeFact] = (),
     long_term_evolution_facts: Sequence[KnowledgeFact] = (),
+    contextual_facts: Sequence[KnowledgeFact] = (),
+    interpretation_failure: Exception | None = None,
     locale: SupportedLocale = SupportedLocale.EN_US,
 ) -> None:
-    """Print deterministic Narrative output before generating the existing AI report."""
+    """Print deterministic output, then independently realize a planned AI brief."""
     narrative = NarrativeEngine(
         listening_profile,
         (
-            *ai_facts,
+            *daily_knowledge_facts,
             *recent_facts,
             *long_term_state_facts,
             *long_term_evolution_facts,
         ),
     ).compose()
-    _print_daily_narrative(render_daily_narrative(narrative, locale=locale))
-    report_generator = (
-        report_generator_factory(locale)
-        if report_generator_factory is not None
-        else ReportGenerator(locale=locale)
-    )
-    _print_ai_report(
-        report_generator.generate_daily_report(ai_facts),
-        locale=locale,
-    )
+    visible_report = compose_visible_report(narrative)
+    _print_daily_narrative(render_visible_report(visible_report, locale=locale))
+
+    if interpretation_failure is not None:
+        _print_ai_report(
+            ui_text(locale, UiMessageKey.AI_GENERATION_FAILURE),
+            locale=locale,
+        )
+        return
+
+    try:
+        signals = SignalProjector().project(
+            (
+                *daily_knowledge_facts,
+                *closed_recent_signal_facts,
+                *long_term_state_facts,
+                *long_term_evolution_facts,
+                *contextual_facts,
+            )
+        )
+        plan = InterpretationPlanner().plan(signals, visible_report.manifest)
+        if not plan.items:
+            _print_ai_report(
+                ui_text(locale, UiMessageKey.AI_NO_SIGNAL),
+                locale=locale,
+            )
+            return
+        request = InterpretationRequest.from_plan(
+            plan,
+            signals,
+            visible_report.manifest,
+            locale,
+        )
+        report_generator = (
+            report_generator_factory(locale)
+            if report_generator_factory is not None
+            else ReportGenerator()
+        )
+        ai_report = report_generator.generate_report(request)
+    except Exception:
+        _print_ai_report(
+            ui_text(locale, UiMessageKey.AI_GENERATION_FAILURE),
+            locale=locale,
+        )
+        return
+    _print_ai_report(ai_report, locale=locale)
 
 
 def _print_daily_narrative(report: str) -> None:
@@ -409,7 +513,7 @@ def _print_ai_report(
     *,
     locale: SupportedLocale = SupportedLocale.EN_US,
 ) -> None:
-    """Print the Markdown report generated by the configured LLM provider."""
+    """Print a validated plain-text interpretation or localized status."""
     print()
     print("=" * 40)
     print(ui_text(locale, UiMessageKey.AI_REPORT_LABEL))

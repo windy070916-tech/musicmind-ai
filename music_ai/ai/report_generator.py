@@ -1,67 +1,70 @@
-"""Generate presentation-ready reports from structured knowledge facts."""
+"""Generate validated prose from one typed deterministic interpretation request."""
 
-from collections.abc import Sequence
 import json
 
 from music_ai.ai.base import LLMProvider, create_llm_provider
-from music_ai.ai.daily_brief import DailyBrief
-from music_ai.ai.markdown_renderer import render_daily_brief
-from music_ai.ai.prompts import DAILY_REPORT_PROMPT, build_system_prompt
-from music_ai.knowledge.models import KnowledgeFact
-from music_ai.localization.models import SupportedLocale, require_supported_locale
+from music_ai.ai.interpretation_brief import InterpretationBrief
+from music_ai.ai.interpretation_request import InterpretationRequest
+from music_ai.ai.markdown_renderer import render_interpretation_brief
+from music_ai.ai.prompts import build_system_prompt, build_user_prompt
+from music_ai.localization.models import SupportedLocale
 
 
 class ReportGenerator:
-    """Turn knowledge facts into a Markdown report through an LLM provider."""
+    """Transport a narrow approved request and validate the provider realization."""
 
-    def __init__(
-        self,
-        provider: LLMProvider | None = None,
-        *,
-        locale: SupportedLocale = SupportedLocale.EN_US,
-    ) -> None:
-        """Use an injected provider or create the one selected by configuration."""
-        self._locale = require_supported_locale(locale)
+    def __init__(self, provider: LLMProvider | None = None) -> None:
         self._provider = provider or create_llm_provider()
 
-    def generate_daily_brief(self, facts: Sequence[KnowledgeFact]) -> DailyBrief:
-        """Generate a validated, presentation-independent Daily Brief from facts."""
-        user_prompt = DAILY_REPORT_PROMPT.format(facts=_format_facts(facts))
+    def generate_interpretation(
+        self,
+        request: InterpretationRequest,
+    ) -> InterpretationBrief:
+        """Invoke one provider for a non-empty typed request and validate its output."""
+        if not isinstance(request, InterpretationRequest):
+            raise TypeError("request must be InterpretationRequest.")
+        if not request.plan_items:
+            raise ValueError("The provider cannot be invoked for an empty plan.")
+        locale = SupportedLocale(request.target_locale)
         response = self._provider.generate(
-            build_system_prompt(self._locale),
-            user_prompt,
+            build_system_prompt(locale),
+            build_user_prompt(request.to_json()),
         )
-        return _parse_daily_brief(response)
+        return _parse_interpretation_brief(response, request)
 
-    def generate_daily_report(self, facts: Sequence[KnowledgeFact]) -> str:
-        """Generate the Markdown rendering of a structured Daily Brief."""
-        return render_daily_brief(
-            self.generate_daily_brief(facts),
-            locale=self._locale,
-        )
+    def generate_report(self, request: InterpretationRequest) -> str:
+        """Render the validated dynamic brief as one to three short paragraphs."""
+        return render_interpretation_brief(self.generate_interpretation(request))
 
 
-def _format_facts(facts: Sequence[KnowledgeFact]) -> str:
-    """Convert public knowledge objects into compact, provider-neutral prompt text."""
-    if not facts:
-        return "- No listening facts are available."
-
-    return "\n".join(
-        f"- [{fact.category}] {fact.title}: {fact.description}" for fact in facts
-    )
-
-
-def _parse_daily_brief(response: str) -> DailyBrief:
-    """Decode and validate the JSON Daily Brief returned by the configured provider."""
+def _parse_interpretation_brief(
+    response: str,
+    request: InterpretationRequest,
+) -> InterpretationBrief:
+    """Decode strict JSON and translate all contract failures to one runtime error."""
+    if not isinstance(response, str):
+        raise RuntimeError("LLM provider returned an invalid interpretation response.")
     try:
-        payload = json.loads(response)
-    except json.JSONDecodeError as error:
-        raise RuntimeError("LLM provider returned an invalid Daily Brief response.") from error
-
+        payload = json.loads(response, object_pairs_hook=_unique_object)
+    except (json.JSONDecodeError, ValueError) as error:
+        raise RuntimeError(
+            "LLM provider returned an invalid interpretation response."
+        ) from error
     if not isinstance(payload, dict):
-        raise RuntimeError("LLM provider returned an invalid Daily Brief response.")
-
+        raise RuntimeError("LLM provider returned an invalid interpretation response.")
     try:
-        return DailyBrief.from_payload(payload)
+        return InterpretationBrief.from_payload(payload, request)
     except ValueError as error:
-        raise RuntimeError("LLM provider returned an invalid Daily Brief response.") from error
+        raise RuntimeError(
+            "LLM provider returned an invalid interpretation response."
+        ) from error
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate JSON object keys instead of accepting last-key-wins."""
+    resolved: dict[str, object] = {}
+    for key, value in pairs:
+        if key in resolved:
+            raise ValueError("Duplicate JSON object key.")
+        resolved[key] = value
+    return resolved

@@ -1,39 +1,10 @@
-"""Markdown rendering for MusicMind's structured Daily Brief."""
+"""Minimal rendering for a validated dynamic MusicMind AI brief."""
 
-from music_ai.ai.daily_brief import DailyBrief
-from music_ai.localization.catalog import ui_text
-from music_ai.localization.models import SupportedLocale, UiMessageKey
+from music_ai.ai.interpretation_brief import InterpretationBrief
 
 
-def render_daily_brief(
-    brief: DailyBrief,
-    *,
-    locale: SupportedLocale = SupportedLocale.EN_US,
-) -> str:
-    """Render a Daily Brief in the stable Markdown format used by MusicMind."""
-    summary = "\n".join(f"- {item}" for item in brief.listening_summary)
-    return f"""# {ui_text(locale, UiMessageKey.AI_REPORT_TITLE)}
-
-## 👋 {ui_text(locale, UiMessageKey.AI_GREETING)}
-
-{brief.greeting}
-
-## 🎵 {ui_text(locale, UiMessageKey.AI_LISTENING_SUMMARY)}
-
-{summary}
-
-## 📈 {ui_text(locale, UiMessageKey.AI_TREND)}
-
-{brief.trend}
-
-## 🧠 {ui_text(locale, UiMessageKey.AI_INSIGHT)}
-
-{brief.insight}
-
-## 💡 {ui_text(locale, UiMessageKey.AI_RECOMMENDATION)}
-
-{brief.recommendation}
-
-## ✨ {ui_text(locale, UiMessageKey.AI_CLOSING)}
-
-{brief.closing}"""
+def render_interpretation_brief(brief: InterpretationBrief) -> str:
+    """Render at most three plain-text paragraphs in deterministic plan order."""
+    if not isinstance(brief, InterpretationBrief):
+        raise TypeError("brief must be InterpretationBrief.")
+    return "\n\n".join(item.text for item in brief.items)

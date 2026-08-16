@@ -31,6 +31,9 @@ class FactCategory(StrEnum):
     ARTIST_DURATION_SHARE_EVOLUTION = "artist_duration_share_evolution"
     ARTIST_BREADTH_EVOLUTION = "artist_breadth_evolution"
     LISTENING_CONCENTRATION_EVOLUTION = "listening_concentration_evolution"
+    LISTENING_TIME_OF_DAY_PATTERN = "listening_time_of_day_pattern"
+    ARTIST_TIME_OF_DAY_AFFINITY = "artist_time_of_day_affinity"
+    LISTENING_TIME_OF_DAY_EVOLUTION = "listening_time_of_day_evolution"
 
 
 class InsightType(StrEnum):
@@ -57,6 +60,7 @@ class FactSource(StrEnum):
     RECENT_LISTENING_EVIDENCE = "recent_listening_evidence"
     LONG_TERM_LISTENING_EVIDENCE = "long_term_listening_evidence"
     LONG_TERM_EVOLUTION_EVIDENCE = "long_term_evolution_evidence"
+    CONTEXTUAL_LISTENING_EVIDENCE = "contextual_listening_evidence"
 
 
 class FactTimeHorizon(StrEnum):

@@ -39,16 +39,17 @@ def _window(
     attributed_duration_ms: int = 1_000,
     listening_day_count: int = 10,
     closed_listening_day_count: int = 7,
+    contains_open_snapshot: bool = False,
 ) -> EvolutionWindowEvidence:
     return EvolutionWindowEvidence(
         start_date=start_date,
         end_date=end_date,
         recorded_day_count=30,
         listening_day_count=listening_day_count,
-        closed_day_count=30,
+        closed_day_count=29 if contains_open_snapshot else 30,
         closed_listening_day_count=closed_listening_day_count,
         gap_dates=(),
-        contains_open_snapshot=False,
+        contains_open_snapshot=contains_open_snapshot,
         total_estimated_listening_duration_ms=max(1_000, attributed_duration_ms),
         total_attributed_artist_duration_ms=attributed_duration_ms,
         structurally_sufficient=(
@@ -176,6 +177,7 @@ def _evidence(
     comparison_sufficient: bool = True,
     previous_total_ms: int = 1_000,
     current_total_ms: int = 1_000,
+    current_contains_open_snapshot: bool = False,
 ) -> LongTermEvolutionEvidence:
     previous_listening_days = 10 if comparison_sufficient else 9
     resolved_breadth = breadth or _breadth(
@@ -195,6 +197,7 @@ def _evidence(
             _CURRENT_END,
             attributed_duration_ms=current_total_ms,
             listening_day_count=resolved_breadth.current_listening_day_count,
+            contains_open_snapshot=current_contains_open_snapshot,
         ),
         comparison_evidence_sufficient=comparison_sufficient,
         artist_share_calculable=previous_total_ms > 0 and current_total_ms > 0,
@@ -480,6 +483,7 @@ def test_metadata_is_minimal_raw_immutable_and_date_ranges_are_half_open() -> No
         "previous_end_date",
         "current_start_date",
         "current_end_date",
+        "contains_open_snapshot",
         "previous_value",
         "current_value",
     }
@@ -517,12 +521,25 @@ def test_metadata_is_minimal_raw_immutable_and_date_ranges_are_half_open() -> No
     assert breadth.metadata["current_value"] == 2.5
     assert share.metadata["previous_end_date"] == "2026-07-07"
     assert share.metadata["current_end_date"] == "2026-08-06"
+    assert all(
+        fact.metadata["contains_open_snapshot"] is False
+        for fact in (share, breadth, concentration)
+    )
     for fact in (share, breadth, concentration):
         assert "gap_dates" not in fact.metadata
         assert "previous_window" not in fact.metadata
         assert "current_window" not in fact.metadata
         with pytest.raises(TypeError):
             fact.metadata["direction"] = "changed"  # type: ignore[index]
+
+
+def test_open_snapshot_provenance_is_propagated_to_every_evolution_fact() -> None:
+    facts = LongTermEvolutionKnowledgeEngine(
+        _evidence(current_contains_open_snapshot=True)
+    ).generate_facts()
+
+    assert facts
+    assert all(fact.metadata["contains_open_snapshot"] is True for fact in facts)
 
 
 def test_canonical_breadth_uses_exact_round_half_up() -> None:

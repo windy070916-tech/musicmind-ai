@@ -44,6 +44,8 @@ class UiMessageKey(StrEnum):
     NO_DAILY_CHANGES = "runtime.no_daily_changes"
     NO_DAILY_INSIGHTS = "runtime.no_daily_insights"
     AI_REPORT_LABEL = "runtime.ai_report_label"
+    AI_NO_SIGNAL = "runtime.ai_no_signal"
+    AI_GENERATION_FAILURE = "runtime.ai_generation_failure"
 
     OAUTH_OPEN_URL = "oauth.open_url"
     OAUTH_UNKNOWN_CALLBACK_PATH = "oauth.unknown_callback_path"
@@ -51,14 +53,6 @@ class UiMessageKey(StrEnum):
     OAUTH_INVALID_STATE = "oauth.invalid_state"
     OAUTH_MISSING_CODE = "oauth.missing_code"
     OAUTH_SUCCESS = "oauth.success"
-
-    AI_REPORT_TITLE = "ai.title"
-    AI_GREETING = "ai.section.greeting"
-    AI_LISTENING_SUMMARY = "ai.section.listening_summary"
-    AI_TREND = "ai.section.trend"
-    AI_INSIGHT = "ai.section.insight"
-    AI_RECOMMENDATION = "ai.section.recommendation"
-    AI_CLOSING = "ai.section.closing"
 
     CLI_LOCALE_HELP = "cli.locale_help"
 

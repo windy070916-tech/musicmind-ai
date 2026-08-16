@@ -101,12 +101,13 @@ Narrative completes selection, ordering, limits, and deduplication before any fa
 localization. The same `DailyNarrative` can therefore render in either locale without
 changing its semantic contents.
 
-The AI path continues receiving canonical English daily, trend, and existing insight
-facts only. Recent facts, Sprint 3C state facts, Sprint 3E evolution facts, Memory,
-Temporal Evidence, playback rows, and SQLite data remain excluded. ReportGenerator
-appends a locale-specific language instruction to the unchanged safety prompt.
-`DailyBrief`, its JSON field names, and provider adapters remain unchanged. The AI
-Markdown renderer localizes headings but does not rewrite generated body strings.
+Signal and Planner contracts remain locale-neutral. A typed provider request carries
+the target locale plus only Planner-selected Signals, compact support, approved
+claim scopes, caveats, and relevant semantic visible-content references. Memory,
+Temporal Evidence, playback rows, SQLite data, rejected Signals, full KnowledgeFact
+collections, and localized deterministic Markdown remain excluded. The provider
+generates the planned short paragraphs directly in the target locale; code owns the
+AI area heading and the distinct no-Signal and AI-generation-failure statuses.
 
 AI language compliance is best-effort under the existing provider contract. A
 structurally valid brief is accepted without language detection, retry, or automatic
@@ -115,9 +116,10 @@ translation.
 ## Persistence
 
 Locale is runtime configuration and is never written to SQLite, playback history,
-Memory, snapshots, Temporal Evidence, KnowledgeFact metadata, Narrative metadata, or
-DailyBrief. Adding localization requires no database migration, snapshot-version
-change, Memory rebuild, or historical-data rebuild.
+Memory, snapshots, Temporal Evidence, KnowledgeFact metadata, Signals, plans,
+Narrative metadata, typed interpretation requests, or AI briefs. Adding localization
+requires no database migration, snapshot-version change, Memory rebuild, or
+historical-data rebuild.
 
 Sprint 3E likewise adds no locale persistence, schema change, serializer change,
 snapshot-version change, automatic backfill, or stored localized evolution result.

@@ -4,8 +4,9 @@ MusicMind imports Spotify listening data and builds deterministic daily, recent,
 long-term state, and long-term evolution intelligence. Analytics produces
 statistics, Listening Memory preserves versioned daily evidence, Temporal Analytics
 evaluates explicit bounded periods, Knowledge interprets evidence, and Narrative
-composes the deterministic product output. A configurable LLM report remains
-separate.
+composes the deterministic product output. Qualified Knowledge evidence also flows
+through deterministic Signal Projection and Interpretation Planning before a
+configurable LLM phrases a compact, grounded interpretation.
 
 ## What It Does
 
@@ -18,7 +19,8 @@ and prints:
 - Database update confirmation
 - A deterministic `MusicMind Daily` with the current profile and supported recent
   and `Over Time` observations
-- A separate AI-generated Daily Brief
+- One dynamic `MusicMind AI` area containing up to three planned interpretation
+  paragraphs, or a localized no-Signal / AI-generation-failure status
 
 Both reports use one runtime locale. MusicMind supports Simplified Chinese
 (`zh-CN`) and English (`en-US`), with `zh-CN` as the application default.
@@ -106,6 +108,8 @@ music_ai/
         database.py
         schema.sql
     analytics/
+        contextual_models.py
+        contextual_analytics.py
         listening_analytics.py
         listening_profile.py
     memory/
@@ -121,6 +125,8 @@ music_ai/
         long_term_evolution_models.py
         long_term_evolution_analytics.py
     knowledge/
+        contextual_knowledge_engine.py
+        evidence_reference.py
         message_keys.py
         models.py
         knowledge_engine.py
@@ -130,6 +136,16 @@ music_ai/
     narrative/
         models.py
         engine.py
+    visible_content/
+        models.py
+        composition.py
+    signal/
+        models.py
+        policies.py
+        projection.py
+    planning/
+        models.py
+        planner.py
     presentation/
         narrative_markdown_renderer.py
     localization/
@@ -140,7 +156,8 @@ music_ai/
         fact_localizer.py
     ai/
         base.py
-        daily_brief.py
+        interpretation_brief.py
+        interpretation_request.py
         markdown_renderer.py
         prompts.py
         report_generator.py
@@ -174,10 +191,12 @@ README.md
 Raw playback history remains authoritative. Analytics calculates deterministic
 daily profiles, while Listening Memory stores rebuildable, sparse daily snapshots.
 Each run makes one longitudinal Memory read over `[D-60,D+1)`. That one value serves
-the existing Recent comparison, Sprint 3C's current 30-day state and overlapping
-29-day novelty prefix, and Sprint 3E's adjacent Previous `[D-60,D-30)` versus Current
-`[D-30,D)` evolution comparison. The open local day `D` is eligible only for the
-existing Recent window.
+the unchanged visible Recent `[D-6,D+1)` comparison, an interpretation-only closed
+Recent `[D-7,D)` versus `[D-14,D-7)` comparison, Sprint 3C's current 30-day state and
+overlapping 29-day novelty prefix, and Sprint 3E's adjacent Previous `[D-60,D-30)`
+versus Current `[D-30,D)` evolution comparison. The open local day `D` is eligible
+only for the visible Recent window; the closed Recent facts feed Signal Projection
+but never the deterministic Narrative.
 
 Sprint 3E compares artist attributable-duration share, top-five attributable
 listening concentration, and artists per listening day. Artist duration keeps the
@@ -186,11 +205,27 @@ Sprint 3E attributable denominator. Temporal owns structural sufficiency and exa
 calculations, Knowledge owns product thresholds, and Narrative owns deterministic
 priority, suppression, and semantic deduplication.
 
-The application keeps Recent, Sprint 3C state, and Sprint 3E evolution facts
-separate until Narrative composition. All three remain outside the AI Daily Brief,
-which continues receiving only daily, trend, and existing insight facts. Sprint 3E
-adds no database migration, Memory schema or snapshot-version change, serializer
-change, persistence, automatic backfill, or display history.
+Sprint 4A keeps Knowledge as the canonical factual authority. Signal Projection
+turns qualified closed historical Daily, closed Recent, Sprint 3C state, Sprint 3E
+evolution, and contextual Knowledge observations into bounded interpretation
+candidates. A deterministic
+Planner relates and ranks those Signals, suppresses pure restatement of the
+locale-neutral concepts actually present in the final deterministic report, and
+assigns at most one Primary, one Secondary, and one Watch. The LLM phrases only
+that approved plan through a typed request and a strictly validated dynamic response.
+
+Contextual Analytics reads retained raw playback timestamps over adjacent Previous
+`[D-60,D-30)` and Current `[D-30,D)` windows, excluding open local day `D`. It counts
+observed playback events in four half-open local-clock segments (`00:00-06:00`,
+`06:00-12:00`, `12:00-18:00`, and `18:00-24:00`). It does not use track duration to
+infer time occupancy, infer raw-history completeness from Memory, or describe local
+history as complete Spotify history.
+
+No qualifying Signal and AI generation failure are distinct, localized, nonfatal
+outcomes. Neither prevents delivery of the deterministic report. Sprint 4A adds no
+database migration, Memory version or serializer change, contextual persistence,
+mandatory backfill, AI/plan history, or cross-run novelty state. Round 5 novelty,
+Genre Intelligence, and Saved Library Intelligence remain outside this sprint.
 
 See `docs/architecture.md`, `docs/memory.md`, `docs/temporal.md`,
 `docs/knowledge.md`, `docs/narrative.md`, and `docs/localization.md` for layer
@@ -199,5 +234,7 @@ boundaries and extension guidance.
 Long-term observations describe locally recorded evidence using the existing
 primary-artist attribution rule. They do not guarantee complete Spotify account
 history or define identity, personality, permanent taste, motivation, or emotion.
-This sprint intentionally excludes recommendations, dashboards, comparison
-profiles, persistent display history, automatic backfill, and scheduling.
+The interpretation layer also prohibits unsupported causes, mood or psychological
+inference, first-ever discovery without proof, permanent-preference claims, future
+prediction, and music recommendations. This sprint intentionally excludes dashboards,
+comparison profiles, persistent display history, automatic backfill, and scheduling.
